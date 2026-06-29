@@ -78,8 +78,8 @@ class DoubleConv(nn.Module):
         return self.double_conv(x)
 
 class UNetFrontEnd(nn.Module):
-    """A lightweight U-Net to denoise and blend 5 channels back into 3 channels."""
-    def __init__(self, in_channels=5, out_channels=3):
+    """A lightweight U-Net to denoise and blend channels back into 3 channels."""
+    def __init__(self, in_channels, out_channels):
         super().__init__()
         
         self.inc = DoubleConv(in_channels, 32)
@@ -114,7 +114,7 @@ class UNetFrontEnd(nn.Module):
         return self.outc(x_up2)
 
 class EdgeAwareRobustifier(nn.Module):
-    def __init__(self, base_resnet):
+    def __init__(self, base_resnet, blur_kernel, blur_sigma, unet_in, unet_out):
         super().__init__()
         
         self.base_resnet = base_resnet
@@ -122,8 +122,8 @@ class EdgeAwareRobustifier(nn.Module):
             param.requires_grad = False
         self.base_resnet.eval() 
             
-        self.denoiser = transforms.GaussianBlur(kernel_size=5, sigma=1.0)
-        self.unet_prep = UNetFrontEnd(in_channels=5, out_channels=3)
+        self.denoiser = transforms.GaussianBlur(kernel_size=blur_kernel, sigma=blur_sigma)
+        self.unet_prep = UNetFrontEnd(in_channels=unet_in, out_channels=unet_out)
         
         sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]]).view(1, 1, 3, 3) / 4.0
         sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]]).view(1, 1, 3, 3) / 4.0
@@ -148,10 +148,13 @@ class EdgeAwareRobustifier(nn.Module):
 # 3. Training & Testing Engine
 # ==========================================
 def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, device, 
-                       epochs=10, prog_vis=None, val_dataset=None, plot_every_n_epochs=1, noise_level=0.5):
+                       epochs, save_interval, model_save_path, prog_vis=None, val_dataset=None, 
+                       plot_every_n_epochs=1, noise_level=0.5):
     
     optimizer = torch.optim.Adam(model.unet_prep.parameters(), lr=wandb.config.learning_rate)
     criterion = nn.CrossEntropyLoss()
+    
+    best_noisy_acc = 0.0
     
     print("\nStarting Training (Training U-Net Front-End on CLEAN data only)...")
     for epoch in range(epochs):
@@ -177,6 +180,7 @@ def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, 
         
         # Test on Clean
         clean_correct, clean_total = 0, 0
+        print("Evaluating on Clean Validation Set...")
         with torch.no_grad():
             for images, labels in clean_val_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -187,6 +191,7 @@ def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, 
         
         # Test on Noisy
         noisy_correct, noisy_total = 0, 0
+        print("Evaluating on Noisy Validation Set...")
         with torch.no_grad():
             for images, labels in noisy_val_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -196,6 +201,14 @@ def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, 
         noisy_acc = 100 * noisy_correct / noisy_total
         
         print(f"=== Epoch {epoch+1} | Clean Acc: {clean_acc:.2f}% | Noisy Acc: {noisy_acc:.2f}% ===")
+        
+        # Save Best Model Checkpoint
+        if (epoch + 1) % save_interval == 0:
+            if noisy_acc > best_noisy_acc:
+                best_noisy_acc = noisy_acc
+                torch.save(model.state_dict(), model_save_path)
+                wandb.save(model_save_path)
+                print(f"  [*] Best model saved at epoch {epoch+1} with Noisy Acc: {best_noisy_acc:.2f}%")
         
         # Log Epoch Metrics to WandB
         wandb.log({
@@ -314,7 +327,7 @@ class NetworkProgressionVisualizer:
             axes[1, col].axis('off')
                 
         plt.tight_layout()
-        return fig  # Return figure instead of plt.show()
+        return fig
 
 # ==========================================
 # 5. Main Execution Block
@@ -323,7 +336,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    # Initialize WandB
+    # Initialize WandB with expanded configuration constants
     wandb.init(
         project="unet-robustifier",
         config={
@@ -331,23 +344,31 @@ if __name__ == "__main__":
             "noise_level": 0.5,
             "batch_size": 32,
             "learning_rate": 0.001,
-            "plot_every_n_epochs": 1  # Control plotting frequency here
+            "plot_every_n_epochs": 1,
+            "save_every_n_epochs": 3,
+            "model_save_path": "kernel7_noise0,5.pth",
+            "img_resize": 256,
+            "img_crop": 224,
+            "blur_kernel_size": 7,
+            "blur_sigma": 1.0,
+            "unet_in_channels": 5,
+            "unet_out_channels": 3
         }
     )
     
     train_transforms = transforms.Compose([
-        transforms.Resize(256), transforms.RandomCrop(224),
+        transforms.Resize(wandb.config.img_resize), transforms.RandomCrop(wandb.config.img_crop),
         transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         transforms.RandomApply([AddGaussianNoise(std=wandb.config.noise_level)], p=0.5)
     ])
     
     clean_val_transforms = transforms.Compose([
-        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.Resize(wandb.config.img_resize), transforms.CenterCrop(wandb.config.img_crop),
         transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     
     noisy_val_transforms = transforms.Compose([
-        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.Resize(wandb.config.img_resize), transforms.CenterCrop(wandb.config.img_crop),
         transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         transforms.RandomApply([AddGaussianNoise(std=wandb.config.noise_level)], p=1.0)
     ])
@@ -367,12 +388,18 @@ if __name__ == "__main__":
     base_resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT).to(device)
     
     print("Wrapping with U-Net Edge-Aware Robustifier...")
-    robust_model = EdgeAwareRobustifier(base_resnet).to(device)
+    robust_model = EdgeAwareRobustifier(
+        base_resnet=base_resnet,
+        blur_kernel=wandb.config.blur_kernel_size,
+        blur_sigma=wandb.config.blur_sigma,
+        unet_in=wandb.config.unet_in_channels,
+        unet_out=wandb.config.unet_out_channels
+    ).to(device)
     
     # Initialize visualizer BEFORE training
     prog_vis = NetworkProgressionVisualizer(robust_model)
     
-    # Pass visualizer, clean dataset, and config parameters to the training loop
+    # Pass config parameters directly to the training engine
     train_and_evaluate(
         model=robust_model, 
         train_loader=train_loader, 
@@ -380,6 +407,8 @@ if __name__ == "__main__":
         noisy_val_loader=noisy_val_loader, 
         device=device, 
         epochs=wandb.config.epochs,
+        save_interval=wandb.config.save_every_n_epochs,
+        model_save_path=wandb.config.model_save_path,
         prog_vis=prog_vis,
         val_dataset=clean_val_dataset,
         plot_every_n_epochs=wandb.config.plot_every_n_epochs,
