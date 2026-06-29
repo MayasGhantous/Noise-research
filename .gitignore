@@ -1,0 +1,36 @@
+# ==========================================
+# .gitignore
+# ==========================================
+
+# 1. PyTorch Model Weights & Checkpoints
+*.pth
+*.pt
+*.ckpt
+*.weights
+*.bin
+*.onnx
+
+# 2. Datasets & Archives
+data/
+*.tgz
+*.tar
+*.gz
+*.zip
+
+# 3. Python Cache & Environments
+__pycache__/
+*.pyc
+venv/
+env/
+.conda/
+miniconda/
+
+# 4. Logs & WandB local runs
+wandb/
+logs/
+*.log
+
+# 5. OS & IDE System Files
+.vscode/
+.idea/
+.DS_Store
