@@ -203,13 +203,12 @@ def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, 
         print(f"=== Epoch {epoch+1} | Clean Acc: {clean_acc:.2f}% | Noisy Acc: {noisy_acc:.2f}% ===")
         
         # Save Best Model Checkpoint
-        if (epoch + 1) % save_interval == 0:
-            if noisy_acc > best_noisy_acc:
-                best_noisy_acc = noisy_acc
-                torch.save(model.state_dict(), model_save_path)
-                wandb.save(model_save_path)
-                print(f"  [*] Best model saved at epoch {epoch+1} with Noisy Acc: {best_noisy_acc:.2f}%")
-        
+        if noisy_acc > best_noisy_acc:
+            best_noisy_acc = noisy_acc
+            torch.save(model.state_dict(), model_save_path)
+            wandb.save(model_save_path)
+            print(f"  [*] Best model saved at epoch {epoch+1} with Noisy Acc: {best_noisy_acc:.2f}%")
+    
         # Log Epoch Metrics to WandB
         wandb.log({
             "Epoch": epoch + 1,
