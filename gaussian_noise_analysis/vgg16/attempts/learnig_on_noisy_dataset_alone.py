@@ -296,4 +296,5 @@ if __name__ == "__main__":
     train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=config.num_epochs)
     
     # End the wandb run
+    print("Training completed. Ending wandb run.")  
     wandb.finish()
