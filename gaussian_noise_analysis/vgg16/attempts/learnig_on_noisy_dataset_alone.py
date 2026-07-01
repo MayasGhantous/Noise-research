@@ -30,6 +30,19 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
     layer_names = []
     hooks = []
     
+    def get_hook(name):
+        def hook_fn(module, input, output):
+            activations.append(output.cpu().detach())
+            layer_names.append(name)
+        return hook_fn
+        
+    conv_count = 1
+    for layer in model.features.children():
+        if isinstance(layer, nn.Conv2d):
+            layer_names.append(f"conv{conv_count}")
+            hooks.append(layer.register_forward_hook(get_hook(f"conv{conv_count}")))
+            conv_count += 1
+    
     model.eval()
     with torch.no_grad():
         outputs = model(batch)
