@@ -18,31 +18,24 @@ from orginal import *
 
 def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device, epoch):
     """
-    Creates a single, wide 2-row plot showing the end-to-end progression 
-    of a single image through all Convolutional layers.
-    Row 0: Clean Image -> Clean Conv1 -> Clean Conv2 ...
-    Row 1: Noisy Image -> Noisy Conv1 -> Noisy Conv2 ...
+    Creates a single, wide 2-row plot showing the end-to-end progression.
     """
-    # Pick the SAME random index for both datasets
     idx = torch.randint(0, len(clean_dataset), (1,)).item()
     img_clean, true_label = clean_dataset[idx]
     img_noisy, _ = noisy_dataset[idx]
     
-    # Create a batch: [Clean, Noisy]
     batch = torch.stack([img_clean, img_noisy]).to(device)
 
     activations = []
     layer_names = []
     hooks = []
     
-    # Hook factory to capture outputs
     def get_hook(name):
         def hook_fn(module, input, output):
             activations.append(output.cpu().detach())
             layer_names.append(name)
         return hook_fn
         
-    # Attach hooks to all 13 Conv2d layers in VGG16
     conv_count = 1
     for layer in model.features.children():
         if isinstance(layer, nn.Conv2d):
@@ -50,7 +43,6 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
             hooks.append(layer.register_forward_hook(get_hook(f"conv{conv_count}")))
             conv_count += 1
     
-    # Forward pass
     model.eval()
     with torch.no_grad():
         outputs = model(batch)
@@ -58,11 +50,9 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
         pred_clean = preds[0].item()
         pred_noisy = preds[1].item()
         
-    # Remove hooks
     for handle in hooks:
         handle.remove()
     
-    # Denormalize images for plotting
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
     
@@ -74,12 +64,10 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
     vis_clean = denorm(img_clean)
     vis_noisy = denorm(img_noisy)
 
-    # Setup the Figure (14 columns: 1 for input + 13 for Conv layers)
     num_cols = len(activations) + 1
     fig, axes = plt.subplots(2, num_cols, figsize=(num_cols * 2.5, 6))
     fig.suptitle(f"VGG16 End-to-End Progression | True Class: {true_label}", fontsize=18, weight='bold')
     
-    # --- Plot Column 0: Inputs ---
     axes[0, 0].imshow(vis_clean)
     axes[0, 0].set_title(f"Clean Input\nPred: {pred_clean}", fontsize=10, color='green' if pred_clean == true_label else 'red')
     axes[0, 0].axis('off')
@@ -88,35 +76,24 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
     axes[1, 0].set_title(f"Noisy Input\nPred: {pred_noisy}", fontsize=10, color='green' if pred_noisy == true_label else 'red')
     axes[1, 0].axis('off')
     
-    # --- Plot Columns 1 to 13: Layer Activations ---
     for i in range(len(activations)):
-        # activations[i] has shape [2, Channels, Height, Width]
         act_clean = activations[i][0]
         act_noisy = activations[i][1]
         name = layer_names[i]
         
-        # Find the single most active filter in the CLEAN feature map
         top_filter_idx = act_clean.abs().sum(dim=(1, 2)).argmax().item()
-        
-        # Get spatial dimensions for the title (e.g., 224x224)
         h, w = act_clean.shape[1], act_clean.shape[2]
         
-        # Clean Activation
         axes[0, i+1].imshow(act_clean[top_filter_idx].numpy(), cmap='viridis')
         axes[0, i+1].set_title(f"{name}\n{h}x{w}\nCh {top_filter_idx}", fontsize=9)
         axes[0, i+1].axis('off')
         
-        # Noisy Activation (Using the EXACT same filter index for comparison)
         axes[1, i+1].imshow(act_noisy[top_filter_idx].numpy(), cmap='viridis')
         axes[1, i+1].axis('off')
 
     plt.tight_layout()
-    
-    # Log the massive single image to WandB
     wandb.log({"Network Progression": wandb.Image(fig), "epoch": epoch})
-    
     plt.close(fig)
-
 
 def train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=5):
     """
@@ -184,6 +161,13 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
 
     print("Training completed.")
 
+def train_val_split(dataset, train_indices, val_indices):
+    """
+    Splits a dataset into training and validation subsets.
+    """
+    train_subset = Subset(dataset, train_indices)
+    val_subset = Subset(dataset, val_indices)
+    return train_subset, val_subset
 
 if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
@@ -241,8 +225,8 @@ if __name__ == "__main__":
         normalization
     ])
 
-    train_dataset = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    dataset_size = len(train_dataset)
+    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    dataset_size = len(train_dataset1)
     train_size = int(config.train_split_ratio * dataset_size)    
     generator = torch.Generator().manual_seed(config.seed)
     indices = torch.randperm(dataset_size, generator=generator).tolist()
@@ -257,12 +241,13 @@ if __name__ == "__main__":
         normalization
     ])
 
-    train_dataset1 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
+
     train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    
-    train_subset = Subset(train_dataset1, train_indices)
-    val_subset = Subset(train_dataset2, val_indices)
-    val2_subset = Subset(train_dataset, val_indices)  
+    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
+    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
+
 
     train_loader = DataLoader(
         train_subset, 
@@ -271,7 +256,6 @@ if __name__ == "__main__":
         num_workers=config.num_workers
     )
     
-    val_subset.dataset.transform = transform_clean  
     val_loader = DataLoader(
         val_subset, 
         batch_size=config.batch_size, 
@@ -290,6 +274,7 @@ if __name__ == "__main__":
     print("Loading validation datasets with different noise profiles...")
     
     dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+
     loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
     dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)

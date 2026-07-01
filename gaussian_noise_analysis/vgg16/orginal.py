@@ -128,7 +128,7 @@ def main():
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
     
-    dataset_clean = ImageFolder(root=val_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+    dataset_clean = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
     loader_clean = DataLoader(dataset_clean, batch_size=32, shuffle=False, num_workers=2)
 
     dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
