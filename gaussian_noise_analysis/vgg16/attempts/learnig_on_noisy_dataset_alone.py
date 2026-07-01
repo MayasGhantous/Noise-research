@@ -16,37 +16,41 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from orginal import *
 
-def visualize_all_layer_activations(model, clean_dataset, noisy_dataset, device, epoch):
+def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device, epoch):
     """
-    Pulls the SAME random image from both clean and noisy datasets, 
-    passes them through the model, and plots them in a 2-row grid.
+    Creates a single, wide 2-row plot showing the end-to-end progression 
+    of a single image through all Convolutional layers.
+    Row 0: Clean Image -> Clean Conv1 -> Clean Conv2 ...
+    Row 1: Noisy Image -> Noisy Conv1 -> Noisy Conv2 ...
     """
-    # Pick a random index to ensure we get the exact same image for both clean and noisy
+    # Pick the SAME random index for both datasets
     idx = torch.randint(0, len(clean_dataset), (1,)).item()
-    
     img_clean, true_label = clean_dataset[idx]
     img_noisy, _ = noisy_dataset[idx]
     
-    # Create a batch of size 2: [Clean, Noisy]
+    # Create a batch: [Clean, Noisy]
     batch = torch.stack([img_clean, img_noisy]).to(device)
 
-    activations = {}
+    activations = []
+    layer_names = []
     hooks = []
     
-    # Define a hook factory
+    # Hook factory to capture outputs
     def get_hook(name):
         def hook_fn(module, input, output):
-            activations[name] = output.cpu().detach()
+            activations.append(output.cpu().detach())
+            layer_names.append(name)
         return hook_fn
         
-    # Attach hooks to Convolutional layers
-    for layer_idx, layer in enumerate(model.features.children()):
+    # Attach hooks to all 13 Conv2d layers in VGG16
+    conv_count = 1
+    for layer in model.features.children():
         if isinstance(layer, nn.Conv2d):
-            layer_name = f"Conv2d_{layer_idx}"
-            handle = layer.register_forward_hook(get_hook(layer_name))
-            hooks.append(handle)
+            layer_names.append(f"conv{conv_count}")
+            hooks.append(layer.register_forward_hook(get_hook(f"conv{conv_count}")))
+            conv_count += 1
     
-    # Forward pass the batch of 2 images
+    # Forward pass
     model.eval()
     with torch.no_grad():
         outputs = model(batch)
@@ -54,11 +58,11 @@ def visualize_all_layer_activations(model, clean_dataset, noisy_dataset, device,
         pred_clean = preds[0].item()
         pred_noisy = preds[1].item()
         
-    # Remove all hooks
+    # Remove hooks
     for handle in hooks:
         handle.remove()
     
-    # Helper to Denormalize images for plotting
+    # Denormalize images for plotting
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
     
@@ -70,53 +74,48 @@ def visualize_all_layer_activations(model, clean_dataset, noisy_dataset, device,
     vis_clean = denorm(img_clean)
     vis_noisy = denorm(img_noisy)
 
-    wandb_images = {"epoch": epoch}
+    # Setup the Figure (14 columns: 1 for input + 13 for Conv layers)
+    num_cols = len(activations) + 1
+    fig, axes = plt.subplots(2, num_cols, figsize=(num_cols * 2.5, 6))
+    fig.suptitle(f"VGG16 End-to-End Progression | True Class: {true_label}", fontsize=18, weight='bold')
+    
+    # --- Plot Column 0: Inputs ---
+    axes[0, 0].imshow(vis_clean)
+    axes[0, 0].set_title(f"Clean Input\nPred: {pred_clean}", fontsize=10, color='green' if pred_clean == true_label else 'red')
+    axes[0, 0].axis('off')
+    
+    axes[1, 0].imshow(vis_noisy)
+    axes[1, 0].set_title(f"Noisy Input\nPred: {pred_noisy}", fontsize=10, color='green' if pred_noisy == true_label else 'red')
+    axes[1, 0].axis('off')
+    
+    # --- Plot Columns 1 to 13: Layer Activations ---
+    for i in range(len(activations)):
+        # activations[i] has shape [2, Channels, Height, Width]
+        act_clean = activations[i][0]
+        act_noisy = activations[i][1]
+        name = layer_names[i]
+        
+        # Find the single most active filter in the CLEAN feature map
+        top_filter_idx = act_clean.abs().sum(dim=(1, 2)).argmax().item()
+        
+        # Get spatial dimensions for the title (e.g., 224x224)
+        h, w = act_clean.shape[1], act_clean.shape[2]
+        
+        # Clean Activation
+        axes[0, i+1].imshow(act_clean[top_filter_idx].numpy(), cmap='viridis')
+        axes[0, i+1].set_title(f"{name}\n{h}x{w}\nCh {top_filter_idx}", fontsize=9)
+        axes[0, i+1].axis('off')
+        
+        # Noisy Activation (Using the EXACT same filter index for comparison)
+        axes[1, i+1].imshow(act_noisy[top_filter_idx].numpy(), cmap='viridis')
+        axes[1, i+1].axis('off')
 
-    # Generate a plot for each captured layer
-    for layer_name, act in activations.items():
-        # act has shape [2, Channels, Height, Width]
-        act_clean = act[0]
-        act_noisy = act[1]
-        
-        # Find the top 3 most activated channels based on the CLEAN image
-        # This allows us to see how the noise disrupts the *expected* features
-        channel_sums = act_clean.abs().sum(dim=(1, 2))
-        top_k_indices = channel_sums.topk(3).indices
-        
-        # Set up a 2x4 grid
-        fig, axes = plt.subplots(2, 4, figsize=(16, 8))
-        fig.suptitle(f"True Class: {true_label}", fontsize=20, weight='bold', y=1.05)
-        
-        # --- ROW 0: CLEAN ---
-        axes[0, 0].imshow(vis_clean)
-        axes[0, 0].set_title(f"Predicted: {pred_clean}", fontsize=14)
-        axes[0, 0].axis('off')
-        
-        for i, fmap_idx in enumerate(top_k_indices):
-            fmap = act_clean[fmap_idx].numpy()
-            axes[0, i+1].imshow(fmap, cmap='viridis')
-            axes[0, i+1].set_title(f"Clean Filter {fmap_idx.item()}")
-            axes[0, i+1].axis('off')
-            
-        # --- ROW 1: NOISY ---
-        axes[1, 0].imshow(vis_noisy)
-        axes[1, 0].set_title(f"Predicted: {pred_noisy}", fontsize=14)
-        axes[1, 0].axis('off')
-        
-        for i, fmap_idx in enumerate(top_k_indices):
-            fmap = act_noisy[fmap_idx].numpy()
-            axes[1, i+1].imshow(fmap, cmap='viridis')
-            axes[1, i+1].set_title(f"Noisy Filter {fmap_idx.item()}")
-            axes[1, i+1].axis('off')
-            
-        plt.tight_layout()
-        
-        # Store the figure in our dictionary under a grouped folder name
-        wandb_images[f"Layer Visualizations/{layer_name}"] = wandb.Image(fig)
-        plt.close(fig) # Close the figure to free memory
-        
-    # Log all images to WandB at once
-    wandb.log(wandb_images)
+    plt.tight_layout()
+    
+    # Log the massive single image to WandB
+    wandb.log({"Network Progression": wandb.Image(fig), "epoch": epoch})
+    
+    plt.close(fig)
 
 
 def train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=5):
@@ -159,7 +158,7 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
         acc_noisy = evaluate_model(model, val_loader2, device, description=f"Validation with Noise after Epoch {epoch + 1}")
         
         # --- Visualization Step ---
-        visualize_all_layer_activations(
+        visualize_end_to_end_progression(
             model=model, 
             clean_dataset=val_loader.dataset, 
             noisy_dataset=val_loader2.dataset, 
@@ -205,6 +204,7 @@ if __name__ == "__main__":
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
             "best_model_filename": "best_model.pth"
+            
         }
     )
     config = wandb.config
