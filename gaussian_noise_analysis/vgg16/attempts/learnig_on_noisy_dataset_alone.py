@@ -30,19 +30,6 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
     layer_names = []
     hooks = []
     
-    def get_hook(name):
-        def hook_fn(module, input, output):
-            activations.append(output.cpu().detach())
-            layer_names.append(name)
-        return hook_fn
-        
-    conv_count = 1
-    for layer in model.features.children():
-        if isinstance(layer, nn.Conv2d):
-            layer_names.append(f"conv{conv_count}")
-            hooks.append(layer.register_forward_hook(get_hook(f"conv{conv_count}")))
-            conv_count += 1
-    
     model.eval()
     with torch.no_grad():
         outputs = model(batch)
@@ -75,7 +62,7 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
     axes[1, 0].imshow(vis_noisy)
     axes[1, 0].set_title(f"Noisy Input\nPred: {pred_noisy}", fontsize=10, color='green' if pred_noisy == true_label else 'red')
     axes[1, 0].axis('off')
-    '''
+
     for i in range(len(activations)):
         act_clean = activations[i][0]
         act_noisy = activations[i][1]
@@ -90,7 +77,7 @@ def visualize_end_to_end_progression(model, clean_dataset, noisy_dataset, device
         
         axes[1, i+1].imshow(act_noisy[top_filter_idx].numpy(), cmap='viridis')
         axes[1, i+1].axis('off')
-    '''
+    
     plt.tight_layout()
     wandb.log({"Network Progression": wandb.Image(fig), "epoch": epoch})
     plt.close(fig)
@@ -173,7 +160,7 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="noisy-dataset-training",
-        name="vgg16-noise-experiment",
+        name="noisy training set",
         config={
             "learning_rate": 1e-6,
             "num_epochs": 5,
@@ -184,10 +171,10 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 1.0,
-            "train_noise_prob": 0.,
+            "train_noise_prob": 0.5,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "best_model.pth"
+            "best_model_filename": "noisy.pth"
             
         }
     )
