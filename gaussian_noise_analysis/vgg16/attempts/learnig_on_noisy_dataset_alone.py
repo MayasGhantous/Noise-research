@@ -176,7 +176,7 @@ if __name__ == "__main__":
         name="noisy training set",
         config={
             "learning_rate": 1e-6,
-            "num_epochs": 5,
+            "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
