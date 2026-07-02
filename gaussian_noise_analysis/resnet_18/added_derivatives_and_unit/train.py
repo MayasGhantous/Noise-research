@@ -470,7 +470,7 @@ if __name__ == "__main__":
         unet_out=wandb.config.unet_out_channels
     ).to(device)
     
-    optimizer = torch.optim.Adam([{ "params": model.unet_prep.parameters(), "lr": config.learning_rate },{ "params": model.base_resnet.parameters(), "lr": config.learning_rate/100 }])
+    optimizer = torch.optim.Adam([{ "params": model.unet_prep.parameters(), "lr": config.learning_rate },{ "params": model.base_resnet.parameters(), "lr": config.learning_rate/10 }])
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
