@@ -20,18 +20,55 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from orginal import *
 
+def replace_bn_with_gn(module, num_groups=32):
+    """
+    Recursively traverses a PyTorch module and replaces all instances 
+    of nn.BatchNorm2d with nn.GroupNorm.
+    
+    Args:
+        module (nn.Module): The PyTorch model or module to modify.
+        num_groups (int): The number of groups for GroupNorm. 
+                          Default is 32 (standard for ResNet architectures).
+                          
+    Returns:
+        nn.Module: The modified module.
+    """
+    for name, child in module.named_children():
+        if isinstance(child, nn.BatchNorm2d):
+            # Get the number of channels from the BatchNorm layer
+            num_channels = child.num_features
+            
+            # Ensure the number of channels is divisible by the number of groups
+            # If not, adjust the number of groups to 1 (which equals LayerNorm) 
+            # or to the number of channels (which equals InstanceNorm).
+            if num_channels % num_groups != 0:
+                actual_groups = num_channels  # Fallback to InstanceNorm essentially
+                print(f"Warning: {num_channels} channels not divisible by {num_groups}. "
+                      f"Using {actual_groups} groups for layer '{name}'.")
+            else:
+                actual_groups = num_groups
 
+            # Create the new GroupNorm layer
+            gn = nn.GroupNorm(num_groups=actual_groups, num_channels=num_channels)
+            
+            # Replace the layer in the model
+            setattr(module, name, gn)
+        else:
+            # Recursively apply to nested child modules
+            replace_bn_with_gn(child, num_groups)
+            
+    return module
 
 class DoubleConv(nn.Module):
-    """(Conv2d => BatchNorm => ReLU) * 2"""
+    """(Conv2d => GroupNorm => ReLU) * 2"""
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=config.group_norm_groups, num_channels=out_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=config.group_norm_groups, num_channels=out_channels),
             nn.ReLU(inplace=True)
         )
 
@@ -303,7 +340,7 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="Unet-kenel3",
+        name="Unet-kenel3 groupnorm8",
         config={
             "learning_rate": 1e-3,
             "num_epochs": 20,
@@ -322,7 +359,8 @@ if __name__ == "__main__":
             "blur_kernel_size": 3,
             "blur_sigma": 0.7,
             "unet_in_channels": 5,
-            "unet_out_channels": 3
+            "unet_out_channels": 3,
+            "group_norm_groups": 8
         }
     )
     config = wandb.config
@@ -421,6 +459,8 @@ if __name__ == "__main__":
     print("Downloading/Loading pretrained ResNet18...")
     base_resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
     #base_resnet.load_state_dict(torch.load("original.pth"))
+    if config.group_norm_groups > 0:
+        base_resnet = replace_bn_with_gn(base_resnet, num_groups=config.group_norm_groups)
     base_resnet = base_resnet.to(device)
     model = EdgeAwareRobustifier(
         base_resnet=base_resnet,
