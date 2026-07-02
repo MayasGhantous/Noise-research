@@ -152,29 +152,50 @@ def train_model(model,config, train_loader, val_loader, val_loader2, criterion, 
     wandb.watch(model, criterion, log="all", log_freq=10)
     num_epochs = config.num_epochs
     plot_every_n_epochs = config.plot_every_n_epochs
+    MSE_loss_fn = nn.MSELoss()
+
+    optimizer2 = torch.optim.Adam([{ "params": model.unet_prep.parameters(), "lr": config.learning_rate}])
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
+        running_unet_loss = 0.0
         correct = 0
         total = 0
 
         for images, labels in train_loader:
             images = images.to(device)
             labels = labels.to(device)
+            noisy_images = images + torch.randn_like(images) * config.train_noise_std
+            noisey_images = noisy_images.to(device)
+
+            optimizer2.zero_grad()
+            outputs_noisy = model.unet_prep(noisey_images)
+            outputs = model.unet_prep(images)
+            unet_loss = MSE_loss_fn(outputs_noisy, outputs)
+            unet_loss.backward()
+            optimizer2.step()
+            running_unet_loss += unet_loss.item()
+
+            
+
+
 
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-
             running_loss += loss.item()
             _, predicted = torch.max(outputs, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            
+
+
 
         epoch_loss = running_loss / len(train_loader)
         epoch_accuracy = 100 * correct / total
+        epoch_unet_loss = running_unet_loss / len(train_loader)
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%")
 
         # Evaluate on validation set after each epoch
@@ -183,10 +204,11 @@ def train_model(model,config, train_loader, val_loader, val_loader2, criterion, 
         
         # --- Visualization Step ---
         wandb.log({
-            "Epoch": epoch + 1,
+            "training accuracy": epoch_accuracy,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
-            "Epoch Training Loss": epoch_loss / len(train_loader)
+            "Epoch Training Loss": epoch_loss / len(train_loader),
+            "Epoch UNet Loss": epoch_unet_loss / len(train_loader)
         })
 
         # Generate & Log Comparative Plot
@@ -340,7 +362,7 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="Unet-kenel3 groupnorm8",
+        name="Unet-kenel3 groupnorm8 mse",
         config={
             "learning_rate": 1e-3,
             "num_epochs": 20,
@@ -351,10 +373,10 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 1.0,
-            "train_noise_prob": 0.5,
+            "train_noise_prob": 0.,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "kernel3_groupnorm8.pth",
+            "best_model_filename": "kernel3_groupnorm8_mse.pth",
             "plot_every_n_epochs": 1,
             "blur_kernel_size": 3,
             "blur_sigma": 0.7,
