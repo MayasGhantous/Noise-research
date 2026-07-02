@@ -84,7 +84,7 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
             wandb.log({f"Network Progression (Feature Map 5)": wandb.Image(fig)})
             plt.close(fig)
 
-        if best_accuracy < noisy_acc:
+        if best_accuracy <= noisy_acc:
             best_accuracy = noisy_acc
             # Save using the specific filename set in wandb config
             torch.save(model.state_dict(), wandb.config.best_model_filename)
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="first training run",
+        name="train_with_noise 1",
         config={
             "learning_rate": 1e-6,
             "num_epochs": 20,
@@ -199,7 +199,7 @@ if __name__ == "__main__":
             "train_noise_prob": 0.,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "original.pth"
+            "best_model_filename": "noise1.pth",
             "plot_every_n_epochs": 1
             
         }
