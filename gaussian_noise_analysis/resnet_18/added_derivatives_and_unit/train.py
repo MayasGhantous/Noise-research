@@ -362,16 +362,33 @@ if __name__ == "__main__":
     # 2. Download and Extract
     train_dir, test_dir = download_and_extract_imagenette(data_dir=os.path.join(parent_dir, "data"))
     
-    base_transform = [transforms.Resize(config.image_resize),
+    base_transforms = [
+        transforms.Resize(config.image_resize),
         transforms.CenterCrop(config.image_crop),
-        transforms.ToTensor()]
+        transforms.ToTensor(),
+    ]
     
-    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225])
+    normalization = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], 
+        std=[0.229, 0.224, 0.225]
+    )
 
-    clean_transform = transforms.Compose([*base_transform ,normalization])
+    transform_clean = transforms.Compose([*base_transforms, normalization])
+    
+    transform_noise_std1 = transforms.Compose([
+        *base_transforms, 
+        AddGaussianNoise(mean=0.0, std=config.eval_noise_std1), 
+        normalization
+    ])
+    
+    transform_noise_std2 = transforms.Compose([
+        *base_transforms, 
+        AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), 
+        normalization
+    ])
 
-    train_dataset = ImageFolder(root=train_dir, transform=clean_transform, target_transform=map_class_to_imagenet)
-    dataset_size = len(train_dataset)
+    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    dataset_size = len(train_dataset1)
     train_size = int(config.train_split_ratio * dataset_size)    
     generator = torch.Generator().manual_seed(config.seed)
     indices = torch.randperm(dataset_size, generator=generator).tolist()
@@ -380,13 +397,18 @@ if __name__ == "__main__":
     train_indices = indices[:train_size]
     val_indices = indices[train_size:]
 
-    _, val_subset = train_val_split(train_dataset, train_indices, val_indices)
+    train_transform = transforms.Compose([
+        *base_transforms,
+        transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob), 
+        normalization
+    ])
 
-    train_dataset2 = ImageFolder(root=train_dir, transform=[*base_transform,transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob)], target_transform=map_class_to_imagenet)
-    train_subset, _ = train_val_split(train_dataset2, train_indices, val_indices)
 
-    train_dataset3 = ImageFolder(root=train_dir, transform=[*base_transform,transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=1)], target_transform=map_class_to_imagenet)
-    _,val2_subset = train_val_split(train_dataset3, train_indices, val_indices)
+    train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
+    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
 
 
     train_loader = DataLoader(
@@ -403,25 +425,24 @@ if __name__ == "__main__":
         num_workers=config.num_workers
     )
 
-    val2_loader = DataLoader(
+    val_loader2 = DataLoader(
         val2_subset, 
         batch_size=config.batch_size, 
-        shuffle=False,  
+        shuffle=False, 
         num_workers=config.num_workers
     )
-
-   
     
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
     
-    dataset_clean = ImageFolder(root=test_dir, transform=clean_transform, target_transform=map_class_to_imagenet)
+    dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+
     loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    dataset_noise1 = ImageFolder(root=test_dir, transform=[*base_transform,AddGaussianNoise(std=config.eval_noise_std1),normalization], target_transform=map_class_to_imagenet)
+    dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
     loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    dataset_noise2 = ImageFolder(root=test_dir, transform=[*base_transform,AddGaussianNoise(std=config.eval_noise_std2),normalization], target_transform=map_class_to_imagenet)
+    dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
     loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
     # 5. Load Pretrained ResNet18
@@ -443,7 +464,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
-    train_model(model, config, train_loader, val_loader,val2_loader, criterion, optimizer, device, prog_vis=NetworkProgressionVisualizer(model))
+    train_model(model, config, train_loader, val_loader,val_loader2, criterion, optimizer, device, prog_vis=NetworkProgressionVisualizer(model))
 
     model.load_state_dict(torch.load(config.best_model_filename))
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
