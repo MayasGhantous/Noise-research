@@ -186,7 +186,7 @@ class NetworkProgressionVisualizer:
         self.base_resnet = robust_model.base_resnet 
         self.activations = {}
         self.hooks = []
-        self.target_layers = ['conv1', 'layer1', 'layer2', 'layer3', 'layer4']
+        self.target_layers = ['conv1', 'layer1', 'layer2', 'layer3', 'layer4','layer5']
         self._register_hooks()
 
     def _register_hooks(self):
