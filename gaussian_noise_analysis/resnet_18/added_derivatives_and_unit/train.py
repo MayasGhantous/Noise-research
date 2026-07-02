@@ -126,11 +126,9 @@ def train_model(model, config, train_loader, val_loader, val2_loader, criterion,
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        running_unet_loss = 0.0
         
         # Track both clean and noisy correct predictions
         correct_clean = 0
-        correct_noisy = 0
         total = 0
 
         for images, labels in train_loader:
@@ -138,48 +136,27 @@ def train_model(model, config, train_loader, val_loader, val2_loader, criterion,
             # Move to device FIRST for faster noise generation on GPU
             images = images.to(device)
             labels = labels.to(device)
-            noisy_images = images + torch.randn_like(images) * config.train_noise_std
+
 
             optimizer.zero_grad()
-            
-            # U-Net Prep Forward Pass
-            outputs_noisy_prep = model.get_unit_output(noisy_images)
-            outputs_prep = model.get_unit_output(images)
-            unet_loss = MSE_loss_fn(outputs_noisy_prep, outputs_prep)
-            running_unet_loss += unet_loss.item()
-
-            # Main Model Forward Pass
             outputs = model(images)
-            outputs_noisy = model(noisy_images)
-            
-            loss = criterion(outputs, labels) + criterion(outputs_noisy, labels)
+            loss = criterion(outputs, labels) 
             running_loss += loss.item()
-            
-            # --- Accuracy Metrics ---
+           
             total += labels.size(0)
-            
-            # Clean accuracy
+
             _, predicted_clean = torch.max(outputs, 1)
             correct_clean += (predicted_clean == labels).sum().item()
-            
-            # Noisy accuracy (NEW)
-            _, predicted_noisy = torch.max(outputs_noisy, 1)
-            correct_noisy += (predicted_noisy == labels).sum().item()
-            
-            # Backward pass AND Optimization
-            over_all_loss = loss + unet_loss
-            over_all_loss.backward()
+            loss.backward()
             optimizer.step() 
             
         epoch_loss = running_loss / len(train_loader)
-        epoch_unet_loss = running_unet_loss / len(train_loader)
         
         # Calculate percentages
         epoch_clean_accuracy = 100 * correct_clean / total
-        epoch_noisy_accuracy = 100 * correct_noisy / total
         
-        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, "
-              f"Clean Acc: {epoch_clean_accuracy:.2f}%, Noisy Acc: {epoch_noisy_accuracy:.2f}%")
+        
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Clean Accuracy: {epoch_clean_accuracy:.2f}%")
 
         # Evaluate on validation set after each epoch
         clean_acc = evaluate_model(model, val_loader, device, description=f"Validation after Epoch {epoch + 1}")
@@ -189,11 +166,9 @@ def train_model(model, config, train_loader, val_loader, val2_loader, criterion,
         # Log both training accuracies to Weights & Biases
         wandb.log({
             "Training Clean Accuracy": epoch_clean_accuracy,
-            "Training Noisy Accuracy": epoch_noisy_accuracy,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
             "Epoch Training Loss": epoch_loss, 
-            "Epoch UNet Loss": epoch_unet_loss 
         })
 
         # Generate & Log Comparative Plot

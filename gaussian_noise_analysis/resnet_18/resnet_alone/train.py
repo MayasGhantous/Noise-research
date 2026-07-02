@@ -20,7 +20,7 @@ if parent_dir not in sys.path:
 from orginal import *
 
 
-def train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
+def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
     """
     Trains the model on the training dataset and evaluates on the validation dataset.
     """
@@ -56,12 +56,14 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
         # Evaluate on validation set after each epoch
         clean_acc = evaluate_model(model, val_loader, device, description=f"Validation after Epoch {epoch + 1}")
         noisy_acc = evaluate_model(model, val_loader2, device, description=f"Validation with Noise after Epoch {epoch + 1}")
+        higher_order_acc = evaluate_model(model, val_loader3, device, description=f"Validation with Higher Order Noise after Epoch {epoch + 1}")
         
         # --- Visualization Step ---
         wandb.log({
             "Epoch_accuracy": epoch_accuracy,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
+            "Higher Order Validation Accuracy": higher_order_acc,
             "Epoch Training Loss": epoch_loss / len(train_loader)
         })
 
@@ -174,10 +176,10 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="train_with_noise 1 and groupnorm16 prob8",
+        name="base_groupnorm16",
         config={
             "learning_rate": 1e-5,
-            "num_epochs": 50,
+            "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -185,10 +187,10 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 1.0,
-            "train_noise_prob": 0.5,
-            "eval_noise_std1": 1.0,
-            "eval_noise_std2": 2.0,
-            "best_model_filename": "noise1_groupnorm16_prob8.pth",
+            "train_noise_prob": 0.,
+            "eval_noise_std1": 0.5,
+            "eval_noise_std2": 1.0,
+            "best_model_filename": "base_groupnorm16.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": 16,
 
