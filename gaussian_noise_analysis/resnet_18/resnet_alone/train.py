@@ -187,12 +187,12 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 0.5,
-            "train_noise_prob": 0.,
+            "train_noise_prob": 0.5,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "base_groupnorm16.pth",
+            "best_model_filename": "base_prob5.pth",
             "plot_every_n_epochs": 1,
-            "group_norm_groups": 16,
+            "group_norm_groups": 0,
 
             
         }
@@ -254,6 +254,8 @@ if __name__ == "__main__":
     train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
     train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
 
+    train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+    _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)#
 
     train_loader = DataLoader(
         train_subset, 
@@ -271,6 +273,13 @@ if __name__ == "__main__":
 
     val_loader2 = DataLoader(
         val2_subset, 
+        batch_size=config.batch_size, 
+        shuffle=False, 
+        num_workers=config.num_workers
+    )
+
+    val_loader3 = DataLoader(
+        val3_subset, 
         batch_size=config.batch_size, 
         shuffle=False, 
         num_workers=config.num_workers
@@ -305,7 +314,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
-    train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=NetworkProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
+    train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=NetworkProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
 
     model.load_state_dict(torch.load(config.best_model_filename))
     
