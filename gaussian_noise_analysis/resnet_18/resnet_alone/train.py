@@ -62,7 +62,8 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
         
         # --- Visualization Step ---
         wandb.log({
-            "Epoch": epoch + 1,
+            "Epoch_loss": epoch_loss,
+            "Epoch_accuracy": epoch_accuracy,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
             "Epoch Training Loss": epoch_loss / len(train_loader)
@@ -187,7 +188,7 @@ if __name__ == "__main__":
         project="Resnet-18",
         name="train_with_noise 1",
         config={
-            "learning_rate": 1e-6,
+            "learning_rate": 1e-4,
             "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
@@ -298,11 +299,11 @@ if __name__ == "__main__":
 
     # 5. Load Pretrained ResNet18
     print("Downloading/Loading pretrained ResNet18...")
-    #model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-    #model = model.to(device)
-    model = models.resnet18()
-    model.load_state_dict(torch.load("original.pth"))
+    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
     model = model.to(device)
+    '''model = models.resnet18()
+    model.load_state_dict(torch.load("original.pth"))
+    model = model.to(device)'''
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()

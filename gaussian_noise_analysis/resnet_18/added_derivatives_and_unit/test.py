@@ -41,7 +41,25 @@ if __name__ == "__main__":
     train_dir, val_dir = train.download_and_extract_imagenette()
     higher_order_of_noise_val_dataset = train.datasets.ImageFolder(val_dir, transform=higher_order_of_noise_val_transforms, target_transform=train.map_class_to_imagenet)
     higher_order_of_noise_val_loader = torch.utils.data.DataLoader(higher_order_of_noise_val_dataset, batch_size=64, shuffle=False, num_workers=2)
+
+    noise_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.RandomApply([train.AddGaussianNoise(std=1.0)], p=1.0)
+    ])
+    noise_val_dataset = train.datasets.ImageFolder(val_dir, transform=noise_transform, target_transform=train.map_class_to_imagenet)
+    noise_val_loader = torch.utils.data.DataLoader(noise_val_dataset, batch_size=64, shuffle=False, num_workers=2)
+
+    clean_transform = transforms.Compose([
+        transforms.Resize(256), transforms.CenterCrop(224),
+        transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    clean_val_dataset = train.datasets.ImageFolder(val_dir, transform=clean_transform, target_transform=train.map_class_to_imagenet)
+    clean_val_loader = torch.utils.data.DataLoader(clean_val_dataset, batch_size=64, shuffle=False, num_workers=2)
     
+    image_clean, label_clean = next(iter(clean_val_loader))
+    image_noise, label_noise = next(iter(noise_val_loader))
+    image_higher_order_noise, label_higher_order_noise = next(iter(higher_order_of_noise_val_loader))
     print("Loading Pretrained ResNet-18...")
     base_resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT).to(device)
     
@@ -53,7 +71,9 @@ if __name__ == "__main__":
         unet_in=5,
         unet_out=3
     ).to(device)
-    model.load_state_dict(torch.load("kernel7_noise1.pth", map_location=device))
+    model.load_state_dict(torch.load("kernel7_noise1.pth")).to(device)
+    visulizer = train.NetworkProgressionVisualizer(model)
+    figer = visulizer.plot_comparative_progression(image_clean[0].unsqueeze(0), image_noise[0].unsqueeze(0), image_higher_order_noise[0].unsqueeze(0), label_clean[0].item(),5)
     
     sum_test_loss = 0
     sum_accuracy = 0
@@ -63,4 +83,5 @@ if __name__ == "__main__":
         print(f"Round {i+1}: Higher Order Accuracy: {higher_order_acc:.2f}%")
 
     print(f"Average Higher Order Accuracy: {sum_accuracy/5:.2f}%")
+
 
