@@ -187,7 +187,7 @@ if __name__ == "__main__":
         project="Resnet-18",
         name="train_with_noise 1",
         config={
-            "learning_rate": 1e-6,
+            "learning_rate": 1e-3,
             "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,

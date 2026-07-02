@@ -136,8 +136,6 @@ if __name__ == "__main__":
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         AddGaussianNoise(std=1),
-        transforms.GaussianBlur(kernel_size=3, sigma=1),
-        FFTCenterCropResize(crop_size=64, output_size=(224, 224))
     ]
     
     normalization = transforms.Normalize(
@@ -147,9 +145,10 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     np.random.seed(42)
 
-    transform_clean = transforms.Compose([*base_transforms,normalization])
+    transform_clean = transforms.Compose([*base_transforms,normalization,transforms.GaussianBlur(kernel_size=7, sigma=1),FFTCenterCropResize(crop_size=224, output_size=(224, 224))])
     train_set = ImageFolder(root=train_path, transform=transform_clean, target_transform=map_class_to_imagenet)
     train_loader = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=2)
     imges , labels = next(iter(train_loader))
+    
     imge = imges[1]
     plot_tensor_fft_channels(imge)
