@@ -298,8 +298,10 @@ if __name__ == "__main__":
 
     # 5. Load Pretrained ResNet18
     print("Downloading/Loading pretrained ResNet18...")
-    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-    model = model.to(device)
+    #model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    #model = model.to(device)
+    model = models.resnet18()
+    model.load_state_dict(torch.load("original.pth"))
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()

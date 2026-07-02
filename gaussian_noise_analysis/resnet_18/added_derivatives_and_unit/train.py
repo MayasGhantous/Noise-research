@@ -404,7 +404,7 @@ if __name__ == "__main__":
     # 5. Load Pretrained ResNet18
     print("Downloading/Loading pretrained ResNet18...")
     base_resnet = models.resnet18()
-    base_resnet.load_state_dict(models.resnet18(weights=models.ResNet18_Weights.DEFAULT).state_dict())
+    base_resnet.load_state_dict(torch.load("original.pth"))
     base_resnet = base_resnet.to(device)
     model = EdgeAwareRobustifier(
         base_resnet=base_resnet,
