@@ -79,9 +79,9 @@ class EdgeAwareRobustifier(nn.Module):
         super().__init__()
         
         self.base_resnet = base_resnet
-        for param in self.base_resnet.parameters():
+        '''for param in self.base_resnet.parameters():
             param.requires_grad = False
-        self.base_resnet.eval() 
+        self.base_resnet.eval()'''
             
         self.denoiser = transforms.GaussianBlur(kernel_size=blur_kernel, sigma=blur_sigma)
         self.unet_prep = UNetFrontEnd(in_channels=unet_in, out_channels=unet_out)
