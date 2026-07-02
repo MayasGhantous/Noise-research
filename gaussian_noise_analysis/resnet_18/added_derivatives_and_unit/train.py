@@ -202,7 +202,7 @@ class NetworkProgressionVisualizer:
         for hook in self.hooks:
             hook.remove()
 
-    def plot_comparative_progression(self, clean_img, noisy_img, true_label, feature_map_idx=0):
+    def plot_comparative_progression(self, clean_img, noisy_img, higher_order_img, true_label, feature_map_idx=0):
         with torch.no_grad():
             self.activations.clear()
             clean_pred = get_class_name(self.model(clean_img).max(1)[1].item())
@@ -221,11 +221,21 @@ class NetworkProgressionVisualizer:
             n_dx, n_dy = self.model.compute_derivatives(n_smooth)
             n_5ch = torch.cat([n_smooth, n_dx, n_dy], dim=1)
             n_prep = self.model.unet_prep(n_5ch) 
+
+            self.activations.clear()
+            higher_order_pred = get_class_name(self.model(higher_order_img).max(1)[1].item())
+            higher_order_acts = {k: v.clone() for k, v in self.activations.items()}
+
+            h_smooth = self.model.denoiser(higher_order_img)
+            h_dx, h_dy = self.model.compute_derivatives(h_smooth)
+            h_5ch = torch.cat([h_smooth, h_dx, h_dy], dim=1)
+            h_prep = self.model.unet_prep(h_5ch)
+
         
         custom_stages = ['Smoothed', 'dx', 'dy', 'U-Net Out']
         num_cols = 1 + len(custom_stages) + len(self.target_layers) 
         
-        fig, axes = plt.subplots(2, num_cols, figsize=(28, 6))
+        fig, axes = plt.subplots(3, num_cols, figsize=(28, 9))
         fig.suptitle(f"U-Net End-to-End Progression (Feature {feature_map_idx}) | True Class: {get_class_name(true_label)}", fontsize=18)
         
         def plot_pre_resnet(axes_row, img, smooth, dx, dy, prep, prefix, pred):
@@ -255,7 +265,7 @@ class NetworkProgressionVisualizer:
 
         plot_pre_resnet(axes[0], clean_img, c_smooth, c_dx, c_dy, c_prep, "Clean", clean_pred)
         plot_pre_resnet(axes[1], noisy_img, n_smooth, n_dx, n_dy, n_prep, "Noisy", noisy_pred)
-
+        plot_pre_resnet(axes[2], higher_order_img, h_smooth, h_dx, h_dy, h_prep, "Higher-Order", higher_order_pred)
         for i, layer_name in enumerate(self.target_layers):
             col = i + 5 
             if layer_name in clean_acts:
@@ -269,7 +279,13 @@ class NetworkProgressionVisualizer:
                 axes[1, col].imshow(act_n, cmap='viridis')
                 axes[1, col].set_title(f"{layer_name}\n{act_n.shape[0]}x{act_n.shape[1]}")
             axes[1, col].axis('off')
-                
+            
+            if layer_name in higher_order_acts:
+                act_h = higher_order_acts[layer_name][0, feature_map_idx].cpu()
+                axes[2, col].imshow(act_h, cmap='viridis')
+                axes[2, col].set_title(f"{layer_name}\n{act_h.shape[0]}x{act_h.shape[1]}")
+            axes[2, col].axis('off')
+
         plt.tight_layout()
         return fig
 
