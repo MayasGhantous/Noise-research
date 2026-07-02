@@ -20,55 +20,13 @@ if parent_dir not in sys.path:
 from orginal import *
 
 
-
-def replace_bn_with_gn(module, num_groups=32):
-    """
-    Recursively traverses a PyTorch module and replaces all instances 
-    of nn.BatchNorm2d with nn.GroupNorm.
-    
-    Args:
-        module (nn.Module): The PyTorch model or module to modify.
-        num_groups (int): The number of groups for GroupNorm. 
-                          Default is 32 (standard for ResNet architectures).
-                          
-    Returns:
-        nn.Module: The modified module.
-    """
-    for name, child in module.named_children():
-        if isinstance(child, nn.BatchNorm2d):
-            # Get the number of channels from the BatchNorm layer
-            num_channels = child.num_features
-            
-            # Ensure the number of channels is divisible by the number of groups
-            # If not, adjust the number of groups to 1 (which equals LayerNorm) 
-            # or to the number of channels (which equals InstanceNorm).
-            if num_channels % num_groups != 0:
-                actual_groups = num_channels  # Fallback to InstanceNorm essentially
-                print(f"Warning: {num_channels} channels not divisible by {num_groups}. "
-                      f"Using {actual_groups} groups for layer '{name}'.")
-            else:
-                actual_groups = num_groups
-
-            # Create the new GroupNorm layer
-            gn = nn.GroupNorm(num_groups=actual_groups, num_channels=num_channels)
-            
-            # Replace the layer in the model
-            setattr(module, name, gn)
-        else:
-            # Recursively apply to nested child modules
-            replace_bn_with_gn(child, num_groups)
-            
-    return module
-
 def train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
     """
     Trains the model on the training dataset and evaluates on the validation dataset.
     """
     print("\nStarting training...")
     best_accuracy = 0.0
-    
-    # Watch the model to log gradients and parameters
-    wandb.watch(model, criterion, log="all", log_freq=10)
+
 
     for epoch in range(num_epochs):
         model.train()
@@ -212,22 +170,14 @@ class NetworkProgressionVisualizer:
 
 
 
-def train_val_split(dataset, train_indices, val_indices):
-    """
-    Splits a dataset into training and validation subsets.
-    """
-    train_subset = Subset(dataset, train_indices)
-    val_subset = Subset(dataset, val_indices)
-    return train_subset, val_subset
-
 if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="train_with_noise 1 and groupnorm16",
+        name="train_with_noise 1 and groupnorm16 prob8",
         config={
-            "learning_rate": 1e-4,
-            "num_epochs": 20,
+            "learning_rate": 1e-5,
+            "num_epochs": 50,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -238,7 +188,7 @@ if __name__ == "__main__":
             "train_noise_prob": 0.5,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "noise1_groupnorm16.pth",
+            "best_model_filename": "noise1_groupnorm16_prob8.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": 16,
 

@@ -13,6 +13,7 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
 import urllib.request
 import tarfile
+from torch.utils.data import Subset
 
 
 IMAGENETTE_CLASSES = {
@@ -57,9 +58,6 @@ class AddGaussianNoise(object):
         # Generates noise with the same shape as the input tensor
         noise = torch.randn(tensor.size()) * self.std + self.mean
         return tensor + noise
-    
-    def __repr__(self):
-        return self.__class__.__name__ + f'(mean={self.mean}, std={self.std})'
 
 def denormalize(tensor):
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(tensor.device)
@@ -84,6 +82,7 @@ def evaluate_model(model, dataloader, device, description=""):
         for images, labels in dataloader:
             images = images.to(device)
             labels = labels.to(device)
+            
 
             outputs = model(images)
             _, predicted = torch.max(outputs, 1)
@@ -98,6 +97,41 @@ def evaluate_model(model, dataloader, device, description=""):
     
     return accuracy
 
+def train_val_split(dataset, train_indices, val_indices):
+    """
+    Splits a dataset into training and validation subsets.
+    """
+    train_subset = Subset(dataset, train_indices)
+    val_subset = Subset(dataset, val_indices)
+    return train_subset, val_subset
+
+def replace_bn_with_gn(module, num_groups=32):
+
+    for name, child in module.named_children():
+        if isinstance(child, nn.BatchNorm2d):
+            # Get the number of channels from the BatchNorm layer
+            num_channels = child.num_features
+            
+            # Ensure the number of channels is divisible by the number of groups
+            # If not, adjust the number of groups to 1 (which equals LayerNorm) 
+            # or to the number of channels (which equals InstanceNorm).
+            if num_channels % num_groups != 0:
+                actual_groups = num_channels  # Fallback to InstanceNorm essentially
+                print(f"Warning: {num_channels} channels not divisible by {num_groups}. "
+                      f"Using {actual_groups} groups for layer '{name}'.")
+            else:
+                actual_groups = num_groups
+
+            # Create the new GroupNorm layer
+            gn = nn.GroupNorm(num_groups=actual_groups, num_channels=num_channels)
+            
+            # Replace the layer in the model
+            setattr(module, name, gn)
+        else:
+            # Recursively apply to nested child modules
+            replace_bn_with_gn(child, num_groups)
+            
+    return module
 def main():
     # 1. Configuration & Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

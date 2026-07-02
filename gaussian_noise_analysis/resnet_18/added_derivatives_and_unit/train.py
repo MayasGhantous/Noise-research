@@ -20,45 +20,6 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from orginal import *
 
-def replace_bn_with_gn(module, num_groups=32):
-    """
-    Recursively traverses a PyTorch module and replaces all instances 
-    of nn.BatchNorm2d with nn.GroupNorm.
-    
-    Args:
-        module (nn.Module): The PyTorch model or module to modify.
-        num_groups (int): The number of groups for GroupNorm. 
-                          Default is 32 (standard for ResNet architectures).
-                          
-    Returns:
-        nn.Module: The modified module.
-    """
-    for name, child in module.named_children():
-        if isinstance(child, nn.BatchNorm2d):
-            # Get the number of channels from the BatchNorm layer
-            num_channels = child.num_features
-            
-            # Ensure the number of channels is divisible by the number of groups
-            # If not, adjust the number of groups to 1 (which equals LayerNorm) 
-            # or to the number of channels (which equals InstanceNorm).
-            if num_channels % num_groups != 0:
-                actual_groups = num_channels  # Fallback to InstanceNorm essentially
-                print(f"Warning: {num_channels} channels not divisible by {num_groups}. "
-                      f"Using {actual_groups} groups for layer '{name}'.")
-            else:
-                actual_groups = num_groups
-
-            # Create the new GroupNorm layer
-            gn = nn.GroupNorm(num_groups=actual_groups, num_channels=num_channels)
-            
-            # Replace the layer in the model
-            setattr(module, name, gn)
-        else:
-            # Recursively apply to nested child modules
-            replace_bn_with_gn(child, num_groups)
-            
-    return module
-
 class DoubleConv(nn.Module):
     """(Conv2d => GroupNorm => ReLU) * 2"""
     def __init__(self, in_channels, out_channels):
@@ -141,7 +102,8 @@ class EdgeAwareRobustifier(nn.Module):
         x_prepared = self.unet_prep(x_5_channel)
         
         return self.base_resnet(x_prepared)
-def train_model(model,config, train_loader, val_loader, val_loader2, criterion, optimizer, device,prog_vis=None):
+    
+def train_model(model, config, train_loader, val_loader, val2_loader, criterion, optimizer, device, prog_vis=None):
     """
     Trains the model on the training dataset and evaluates on the validation dataset.
     """
@@ -149,66 +111,82 @@ def train_model(model,config, train_loader, val_loader, val_loader2, criterion, 
     best_accuracy = 0.0
     
     # Watch the model to log gradients and parameters
-    wandb.watch(model, criterion, log="all", log_freq=10)
+
     num_epochs = config.num_epochs
     plot_every_n_epochs = config.plot_every_n_epochs
     MSE_loss_fn = nn.MSELoss()
 
-    optimizer2 = torch.optim.Adam([{ "params": model.unet_prep.parameters(), "lr": config.learning_rate}])
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
         running_unet_loss = 0.0
-        correct = 0
+        
+        # Track both clean and noisy correct predictions
+        correct_clean = 0
+        correct_noisy = 0
         total = 0
 
         for images, labels in train_loader:
+            
+            # Move to device FIRST for faster noise generation on GPU
             images = images.to(device)
             labels = labels.to(device)
             noisy_images = images + torch.randn_like(images) * config.train_noise_std
-            noisey_images = noisy_images.to(device)
-
-            optimizer2.zero_grad()
-            outputs_noisy = model.unet_prep(noisey_images)
-            outputs = model.unet_prep(images)
-            unet_loss = MSE_loss_fn(outputs_noisy, outputs)
-            unet_loss.backward()
-            optimizer2.step()
-            running_unet_loss += unet_loss.item()
-
-            
-
-
 
             optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
             
+            # U-Net Prep Forward Pass
+            outputs_noisy_prep = model.unet_prep(noisy_images)
+            outputs_prep = model.unet_prep(images)
+            unet_loss = MSE_loss_fn(outputs_noisy_prep, outputs_prep)
+            running_unet_loss += unet_loss.item()
 
-
-
+            # Main Model Forward Pass
+            outputs = model(images)
+            outputs_noisy = model(noisy_images)
+            
+            loss = criterion(outputs, labels) + criterion(outputs_noisy, labels)
+            running_loss += loss.item()
+            
+            # --- Accuracy Metrics ---
+            total += labels.size(0)
+            
+            # Clean accuracy
+            _, predicted_clean = torch.max(outputs, 1)
+            correct_clean += (predicted_clean == labels).sum().item()
+            
+            # Noisy accuracy (NEW)
+            _, predicted_noisy = torch.max(outputs_noisy, 1)
+            correct_noisy += (predicted_noisy == labels).sum().item()
+            
+            # Backward pass AND Optimization
+            over_all_loss = loss + unet_loss
+            over_all_loss.backward()
+            optimizer.step() 
+            
         epoch_loss = running_loss / len(train_loader)
-        epoch_accuracy = 100 * correct / total
         epoch_unet_loss = running_unet_loss / len(train_loader)
-        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%")
+        
+        # Calculate percentages
+        epoch_clean_accuracy = 100 * correct_clean / total
+        epoch_noisy_accuracy = 100 * correct_noisy / total
+        
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, "
+              f"Clean Acc: {epoch_clean_accuracy:.2f}%, Noisy Acc: {epoch_noisy_accuracy:.2f}%")
 
         # Evaluate on validation set after each epoch
         clean_acc = evaluate_model(model, val_loader, device, description=f"Validation after Epoch {epoch + 1}")
-        noisy_acc = evaluate_model(model, val_loader2, device, description=f"Validation with Noise after Epoch {epoch + 1}")
+        noisy_acc = evaluate_model(model, val2_loader, device, description=f"Validation with Noise after Epoch {epoch + 1}")
         
         # --- Visualization Step ---
+        # Log both training accuracies to Weights & Biases
         wandb.log({
-            "training accuracy": epoch_accuracy,
+            "Training Clean Accuracy": epoch_clean_accuracy,
+            "Training Noisy Accuracy": epoch_noisy_accuracy,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
-            "Epoch Training Loss": epoch_loss / len(train_loader),
-            "Epoch UNet Loss": epoch_unet_loss / len(train_loader)
+            "Epoch Training Loss": epoch_loss, 
+            "Epoch UNet Loss": epoch_unet_loss 
         })
 
         # Generate & Log Comparative Plot
@@ -349,22 +327,13 @@ class NetworkProgressionVisualizer:
         return fig
 
 
-
-def train_val_split(dataset, train_indices, val_indices):
-    """
-    Splits a dataset into training and validation subsets.
-    """
-    train_subset = Subset(dataset, train_indices)
-    val_subset = Subset(dataset, val_indices)
-    return train_subset, val_subset
-
 if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="Unet-kenel3 groupnorm8 mse",
+        name="Unet-kenel3 groupnorm16 mse",
         config={
-            "learning_rate": 1e-3,
+            "learning_rate": 1e-4,
             "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
@@ -376,13 +345,13 @@ if __name__ == "__main__":
             "train_noise_prob": 0.,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "kernel3_groupnorm8_mse.pth",
+            "best_model_filename": "kernel3_groupnorm16_mse.pth",
             "plot_every_n_epochs": 1,
             "blur_kernel_size": 3,
             "blur_sigma": 0.7,
             "unet_in_channels": 5,
             "unet_out_channels": 3,
-            "group_norm_groups": 8
+            "group_norm_groups": 16
         }
     )
     config = wandb.config
@@ -393,34 +362,16 @@ if __name__ == "__main__":
     # 2. Download and Extract
     train_dir, test_dir = download_and_extract_imagenette(data_dir=os.path.join(parent_dir, "data"))
     
-    # 3. Define Image Transforms (Baseline + Noise Variations)
-    base_transforms = [
-        transforms.Resize(config.image_resize),
+    base_transform = [transforms.Resize(config.image_resize),
         transforms.CenterCrop(config.image_crop),
-        transforms.ToTensor(),
-    ]
+        transforms.ToTensor()]
     
-    normalization = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], 
-        std=[0.229, 0.224, 0.225]
-    )
+    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225])
 
-    transform_clean = transforms.Compose([*base_transforms, normalization])
-    
-    transform_noise_std1 = transforms.Compose([
-        *base_transforms, 
-        AddGaussianNoise(mean=0.0, std=config.eval_noise_std1), 
-        normalization
-    ])
-    
-    transform_noise_std2 = transforms.Compose([
-        *base_transforms, 
-        AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), 
-        normalization
-    ])
+    clean_transform = transforms.Compose([*base_transform ,normalization])
 
-    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    dataset_size = len(train_dataset1)
+    train_dataset = ImageFolder(root=train_dir, transform=clean_transform, target_transform=map_class_to_imagenet)
+    dataset_size = len(train_dataset)
     train_size = int(config.train_split_ratio * dataset_size)    
     generator = torch.Generator().manual_seed(config.seed)
     indices = torch.randperm(dataset_size, generator=generator).tolist()
@@ -429,18 +380,13 @@ if __name__ == "__main__":
     train_indices = indices[:train_size]
     val_indices = indices[train_size:]
 
-    train_transform = transforms.Compose([
-        *base_transforms,
-        transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob), 
-        normalization
-    ])
+    _, val_subset = train_val_split(train_dataset, train_indices, val_indices)
 
+    train_dataset2 = ImageFolder(root=train_dir, transform=[*base_transform,transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob)], target_transform=map_class_to_imagenet)
+    train_subset, _ = train_val_split(train_dataset2, train_indices, val_indices)
 
-    train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
-    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
-    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
-    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
+    train_dataset3 = ImageFolder(root=train_dir, transform=[*base_transform,transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=1)], target_transform=map_class_to_imagenet)
+    _,val2_subset = train_val_split(train_dataset3, train_indices, val_indices)
 
 
     train_loader = DataLoader(
@@ -457,24 +403,25 @@ if __name__ == "__main__":
         num_workers=config.num_workers
     )
 
-    val_loader2 = DataLoader(
+    val2_loader = DataLoader(
         val2_subset, 
         batch_size=config.batch_size, 
-        shuffle=False, 
+        shuffle=False,  
         num_workers=config.num_workers
     )
+
+   
     
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
     
-    dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-
+    dataset_clean = ImageFolder(root=test_dir, transform=clean_transform, target_transform=map_class_to_imagenet)
     loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    dataset_noise1 = ImageFolder(root=test_dir, transform=[*base_transform,AddGaussianNoise(std=config.eval_noise_std1),normalization], target_transform=map_class_to_imagenet)
     loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+    dataset_noise2 = ImageFolder(root=test_dir, transform=[*base_transform,AddGaussianNoise(std=config.eval_noise_std2),normalization], target_transform=map_class_to_imagenet)
     loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
     # 5. Load Pretrained ResNet18
@@ -496,7 +443,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
-    train_model(model, config, train_loader, val_loader, val_loader2, criterion, optimizer, device, prog_vis=NetworkProgressionVisualizer(model))
+    train_model(model, config, train_loader, val_loader,val2_loader, criterion, optimizer, device, prog_vis=NetworkProgressionVisualizer(model))
 
     model.load_state_dict(torch.load(config.best_model_filename))
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
