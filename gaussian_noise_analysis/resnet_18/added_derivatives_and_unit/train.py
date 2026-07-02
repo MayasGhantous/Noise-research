@@ -331,8 +331,8 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # 2. Download and Extract
-    train_dir, test_dir = download_and_extract_imagenette(data_dir="./data")
-
+    train_dir, test_dir = download_and_extract_imagenette(data_dir=os.path.join(parent_dir, "data"))
+    
     # 3. Define Image Transforms (Baseline + Noise Variations)
     base_transforms = [
         transforms.Resize(config.image_resize),

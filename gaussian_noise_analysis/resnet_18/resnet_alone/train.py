@@ -21,6 +21,45 @@ from orginal import *
 
 
 
+def replace_bn_with_gn(module, num_groups=32):
+    """
+    Recursively traverses a PyTorch module and replaces all instances 
+    of nn.BatchNorm2d with nn.GroupNorm.
+    
+    Args:
+        module (nn.Module): The PyTorch model or module to modify.
+        num_groups (int): The number of groups for GroupNorm. 
+                          Default is 32 (standard for ResNet architectures).
+                          
+    Returns:
+        nn.Module: The modified module.
+    """
+    for name, child in module.named_children():
+        if isinstance(child, nn.BatchNorm2d):
+            # Get the number of channels from the BatchNorm layer
+            num_channels = child.num_features
+            
+            # Ensure the number of channels is divisible by the number of groups
+            # If not, adjust the number of groups to 1 (which equals LayerNorm) 
+            # or to the number of channels (which equals InstanceNorm).
+            if num_channels % num_groups != 0:
+                actual_groups = num_channels  # Fallback to InstanceNorm essentially
+                print(f"Warning: {num_channels} channels not divisible by {num_groups}. "
+                      f"Using {actual_groups} groups for layer '{name}'.")
+            else:
+                actual_groups = num_groups
+
+            # Create the new GroupNorm layer
+            gn = nn.GroupNorm(num_groups=actual_groups, num_channels=num_channels)
+            
+            # Replace the layer in the model
+            setattr(module, name, gn)
+        else:
+            # Recursively apply to nested child modules
+            replace_bn_with_gn(child, num_groups)
+            
+    return module
+
 def train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
     """
     Trains the model on the training dataset and evaluates on the validation dataset.
@@ -200,7 +239,8 @@ if __name__ == "__main__":
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
             "best_model_filename": "noise1.pth",
-            "plot_every_n_epochs": 1
+            "plot_every_n_epochs": 1,
+            "group_norm_groups": 32,
             
         }
     )
@@ -300,6 +340,9 @@ if __name__ == "__main__":
     print("Downloading/Loading pretrained ResNet18...")
     model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
     model = model.to(device)
+    if config.group_norm_groups > 0:
+        print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
+        model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
     '''model = models.resnet18()
     model.load_state_dict(torch.load("original.pth"))
     model = model.to(device)'''
@@ -311,6 +354,7 @@ if __name__ == "__main__":
     train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=NetworkProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
 
     model.load_state_dict(torch.load(config.best_model_filename))
+    
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
     test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description="Final Test on Noisy Dataset (std=1.0)")
     test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description="Final Test on Noisy Dataset (std=2.0)")
