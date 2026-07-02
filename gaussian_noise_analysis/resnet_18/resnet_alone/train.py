@@ -178,7 +178,7 @@ if __name__ == "__main__":
         project="Resnet-18",
         name="base_groupnorm16",
         config={
-            "learning_rate": 1e-5,
+            "learning_rate": 1e-6,
             "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
@@ -186,7 +186,7 @@ if __name__ == "__main__":
             "train_split_ratio": 0.8,
             "image_resize": 256,
             "image_crop": 224,
-            "train_noise_std": 1.0,
+            "train_noise_std": 0.5,
             "train_noise_prob": 0.,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
