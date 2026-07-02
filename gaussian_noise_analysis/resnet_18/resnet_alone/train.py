@@ -186,13 +186,13 @@ if __name__ == "__main__":
             "train_split_ratio": 0.8,
             "image_resize": 256,
             "image_crop": 224,
-            "train_noise_std": 0.5,
+            "train_noise_std": 0.,
             "train_noise_prob": 0.5,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "base_prob5.pth",
+            "best_model_filename": "base_groupnorm16.pth",
             "plot_every_n_epochs": 1,
-            "group_norm_groups": 0,
+            "group_norm_groups": 16,
 
             
         }
