@@ -62,7 +62,6 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
         
         # --- Visualization Step ---
         wandb.log({
-            "Epoch_loss": epoch_loss,
             "Epoch_accuracy": epoch_accuracy,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
