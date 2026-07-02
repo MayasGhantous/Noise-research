@@ -1,156 +1,80 @@
-import os
-import urllib.request
-import tarfile
+
+import sys
 import torch
 import torch.nn as nn
 import torchvision.models as models
 import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 import wandb
 import random
+from pathlib import Path
 
-os.environ['WANDB_API_KEY'] = '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'
 
-# ==========================================
-# 0. Global Constants & Fixes
-# ==========================================
-IMAGENETTE_CLASSES = {
-    0: 'Tench', 217: 'English Springer', 482: 'Cassette Player', 
-    491: 'Chain Saw', 497: 'Church', 566: 'French Horn', 
-    569: 'Garbage Truck', 571: 'Gas Pump', 574: 'Golf Ball', 701: 'Parachute'
-}
+# 1. Get the absolute path to the parent directory
+parent_dir = str(Path(__file__).parent.parent)
 
-IMAGENETTE_TO_IMAGENET = {0:0, 1:217, 2:482, 3:491, 4:497, 5:566, 6:569, 7:571, 8:574, 9:701}
+# 2. Add the parent directory to Python's search path
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+from orginal import *
 
-def map_class_to_imagenet(y):
-    return IMAGENETTE_TO_IMAGENET[y]
 
-def get_class_name(class_idx):
-    return IMAGENETTE_CLASSES.get(class_idx, f"Class {class_idx}")
 
-# ==========================================
-# 1. Dataset Downloading & Noise Transform
-# ==========================================
-def download_and_extract_imagenette(data_dir="./data"):
-    os.makedirs(data_dir, exist_ok=True)
-    tgz_path = os.path.join(data_dir, "imagenette2-160.tgz")
-    extract_path = os.path.join(data_dir, "imagenette2-160")
+def train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
+    """
+    Trains the model on the training dataset and evaluates on the validation dataset.
+    """
+    print("\nStarting training...")
+    best_accuracy = 0.0
     
-    if not os.path.exists(extract_path):
-        print("Downloading Imagenette (160px version, ~160MB)...")
-        url = "https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-160.tgz"
-        urllib.request.urlretrieve(url, tgz_path)
-        print("Extracting dataset...")
-        with tarfile.open(tgz_path, "r:gz") as tar:
-            tar.extractall(path=data_dir)
-        os.remove(tgz_path)
-    return os.path.join(extract_path, "train"), os.path.join(extract_path, "val")
+    # Watch the model to log gradients and parameters
+    wandb.watch(model, criterion, log="all", log_freq=10)
 
-class AddGaussianNoise(object):
-    def __init__(self, std=1.0):
-        self.std = std
-    def __call__(self, tensor):
-        return tensor + torch.randn_like(tensor) * self.std
-
-def denormalize(tensor):
-    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(tensor.device)
-    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1).to(tensor.device)
-    tensor = tensor * std + mean
-    return torch.clamp(tensor, 0, 1)
-
-# ==========================================
-# 2. Training & Testing Engine
-# ==========================================
-def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, higher_order_of_noise_val_loader, device, 
-                       epochs, save_interval, model_save_path, prog_vis=None, val_dataset=None, 
-                       plot_every_n_epochs=1, noise_level=0.5):
-    
-    optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config.learning_rate)
-    criterion = nn.CrossEntropyLoss()
-    
-    best_noisy_acc = 0.0
-    
-    print("\nStarting Training (Training ResNet-18 on CLEAN data)...")
-    for epoch in range(epochs):
+    for epoch in range(num_epochs):
         model.train()
-        epoch_loss = 0.0
-        
-        for i, (images, labels) in enumerate(train_loader):
-            images, labels = images.to(device), labels.to(device)
-            
+        running_loss = 0.0
+        correct = 0
+        total = 0
+
+        for images, labels in train_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            
-            epoch_loss += loss.item()
-            if i % 20 == 0:
-                print(f"  Epoch [{epoch+1}/{epochs}], Step [{i}/{len(train_loader)}], Loss: {loss.item():.4f}")
-                wandb.log({"Batch Loss": loss.item()})
-                
-        model.eval()
-        
-        # Test on Clean
-        clean_correct, clean_total = 0, 0
-        print("Evaluating on Clean Validation Set...")
-        with torch.no_grad():
-            for images, labels in clean_val_loader:
-                images, labels = images.to(device), labels.to(device)
-                _, predicted = torch.max(model(images).data, 1)
-                clean_total += labels.size(0)
-                clean_correct += (predicted == labels).sum().item()
-        clean_acc = 100 * clean_correct / clean_total
-        
-        # Test on Noisy
-        noisy_correct, noisy_total = 0, 0
-        print("Evaluating on Noisy Validation Set...")
-        with torch.no_grad():
-            for images, labels in noisy_val_loader:
-                images, labels = images.to(device), labels.to(device)
-                _, predicted = torch.max(model(images).data, 1)
-                noisy_total += labels.size(0)
-                noisy_correct += (predicted == labels).sum().item()
-        noisy_acc = 100 * noisy_correct / noisy_total
 
-        # Test on Higher Order of Noise
-        higher_order_correct, higher_order_total = 0, 0
-        print("Evaluating on Higher Order of Noise Validation Set...")
-        with torch.no_grad():
-            for images, labels in higher_order_of_noise_val_loader:
-                images, labels = images.to(device), labels.to(device)
-                _, predicted = torch.max(model(images).data, 1)
-                higher_order_total += labels.size(0)
-                higher_order_correct += (predicted == labels).sum().item()
-        higher_order_acc = 100 * higher_order_correct / higher_order_total
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+        epoch_loss = running_loss / len(train_loader)
+        epoch_accuracy = 100 * correct / total
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%")
+
+        # Evaluate on validation set after each epoch
+        clean_acc = evaluate_model(model, val_loader, device, description=f"Validation after Epoch {epoch + 1}")
+        noisy_acc = evaluate_model(model, val_loader2, device, description=f"Validation with Noise after Epoch {epoch + 1}")
         
-        print(f"=== Epoch {epoch+1} | Clean Acc: {clean_acc:.2f}% | Noisy Acc: {noisy_acc:.2f}% | Higher Order Acc: {higher_order_acc:.2f}% ===")
-        
-        #ALWAYS check for the best model and save it 
-        if noisy_acc > best_noisy_acc:
-            best_noisy_acc = noisy_acc
-            torch.save(model.state_dict(), model_save_path)
-            wandb.save(model_save_path)
-            print(f"  [*] New best model saved at epoch {epoch+1} with Noisy Acc: {best_noisy_acc:.2f}%")
-        
-       
-        # Log Epoch Metrics to WandB
+        # --- Visualization Step ---
         wandb.log({
             "Epoch": epoch + 1,
             "Clean Validation Accuracy": clean_acc,
             "Noisy Validation Accuracy": noisy_acc,
-            "Higher Order Validation Accuracy": higher_order_acc,
             "Epoch Training Loss": epoch_loss / len(train_loader)
         })
 
         # Generate & Log Comparative Plot
-        if prog_vis and val_dataset and (epoch + 1) % plot_every_n_epochs == 0:
-            rand_idx = random.randint(0, len(val_dataset) - 1)
-            img, true_label = val_dataset[rand_idx]
+        if prog_vis and (epoch + 1) % plot_every_n_epochs == 0:
+            rand_idx = random.randint(0, len(val_loader.dataset) - 1)
+            img, true_label = val_loader.dataset[rand_idx]
             
             img_clean = img.unsqueeze(0).to(device)
-            img_noisy = img_clean + torch.randn_like(img_clean) * noise_level
+            img_noisy = img_clean + torch.randn_like(img_clean) * 1.0
             img_higher_order = img_clean + torch.randn_like(img_clean) * 2.0
             
             # Generate the plot
@@ -159,6 +83,15 @@ def train_and_evaluate(model, train_loader, clean_val_loader, noisy_val_loader, 
             # Log to WandB and close the figure to avoid memory leaks
             wandb.log({f"Network Progression (Feature Map 5)": wandb.Image(fig)})
             plt.close(fig)
+
+        if best_accuracy < noisy_acc:
+            best_accuracy = noisy_acc
+            # Save using the specific filename set in wandb config
+            torch.save(model.state_dict(), wandb.config.best_model_filename)
+            print(f"New best model saved as '{wandb.config.best_model_filename}' with accuracy: {best_accuracy:.2f}%")
+            wandb.run.summary["best_val_accuracy_noisy"] = best_accuracy
+
+    print("Training completed.")
 
 # ==========================================
 # 3. Visualization Utilities
@@ -238,86 +171,149 @@ class NetworkProgressionVisualizer:
         plt.tight_layout()
         return fig
 
-# ==========================================
-# 4. Main Execution Block
-# ==========================================
+
+
+def train_val_split(dataset, train_indices, val_indices):
+    """
+    Splits a dataset into training and validation subsets.
+    """
+    train_subset = Subset(dataset, train_indices)
+    val_subset = Subset(dataset, val_indices)
+    return train_subset, val_subset
+
 if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    
-    # Initialize WandB 
+    # --- Initialize W&B and define all constants in the config ---
     wandb.init(
-        project="resnet18-baseline",
+        project="Resnet-18",
+        name="first training run",
         config={
-            "epochs": 3,
-            "noise_level": 1,
+            "learning_rate": 1e-6,
+            "num_epochs": 20,
             "batch_size": 32,
-            "learning_rate": 0.001,
-            "plot_every_n_epochs": 1,
-            "save_every_n_epochs": 3,
-            "model_save_path": "resnet18_baseline.pth",
-            "img_resize": 256,
-            "img_crop": 224,
+            "num_workers": 2,
+            "seed": 42,
+            "train_split_ratio": 0.8,
+            "image_resize": 256,
+            "image_crop": 224,
+            "train_noise_std": 1.0,
+            "train_noise_prob": 0.,
+            "eval_noise_std1": 1.0,
+            "eval_noise_std2": 2.0,
+            "best_model_filename": "original.pth"
+            "plot_every_n_epochs": 1
+            
         }
     )
-    
-    train_transforms = transforms.Compose([
-        transforms.Resize(wandb.config.img_resize), transforms.RandomCrop(wandb.config.img_crop),
-        transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        transforms.RandomApply([AddGaussianNoise(std=wandb.config.noise_level)], p=0.5)
-    ])
-    
-    clean_val_transforms = transforms.Compose([
-        transforms.Resize(wandb.config.img_resize), transforms.CenterCrop(wandb.config.img_crop),
-        transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    
-    noisy_val_transforms = transforms.Compose([
-        transforms.Resize(wandb.config.img_resize), transforms.CenterCrop(wandb.config.img_crop),
-        transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        transforms.RandomApply([AddGaussianNoise(std=wandb.config.noise_level)], p=1.0)
-    ])
-    higher_order_of_noise_val_transforms = transforms.Compose([
-        transforms.Resize(wandb.config.img_resize), transforms.CenterCrop(wandb.config.img_crop),
-        transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        transforms.RandomApply([AddGaussianNoise(std=2.0)], p=1.0)
-    ])
-    print("Preparing Datasets...")
-    train_dir, val_dir = download_and_extract_imagenette()
-    
-    train_dataset = datasets.ImageFolder(train_dir, transform=train_transforms, target_transform=map_class_to_imagenet)
-    clean_val_dataset = datasets.ImageFolder(val_dir, transform=clean_val_transforms, target_transform=map_class_to_imagenet)
-    noisy_val_dataset = datasets.ImageFolder(val_dir, transform=noisy_val_transforms, target_transform=map_class_to_imagenet)
-    higher_order_of_noise_val_dataset = datasets.ImageFolder(val_dir, transform=higher_order_of_noise_val_transforms, target_transform=map_class_to_imagenet)
+    config = wandb.config
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=wandb.config.batch_size, shuffle=True, num_workers=2)
-    clean_val_loader = torch.utils.data.DataLoader(clean_val_dataset, batch_size=64, shuffle=False, num_workers=2)
-    noisy_val_loader = torch.utils.data.DataLoader(noisy_val_dataset, batch_size=64, shuffle=False, num_workers=2)
-    higher_order_of_noise_val_loader = torch.utils.data.DataLoader(higher_order_of_noise_val_dataset, batch_size=64, shuffle=False, num_workers=2)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-    print("Loading ResNet-18...")
-    # Initialize standard ResNet-18 (trainable by default)
-    resnet_model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT).to(device)
+    # 2. Download and Extract
+    train_dir, test_dir = download_and_extract_imagenette(data_dir="./data")
+
+    # 3. Define Image Transforms (Baseline + Noise Variations)
+    base_transforms = [
+        transforms.Resize(config.image_resize),
+        transforms.CenterCrop(config.image_crop),
+        transforms.ToTensor(),
+    ]
     
-    # Initialize visualizer
-    prog_vis = NetworkProgressionVisualizer(resnet_model)
+    normalization = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], 
+        std=[0.229, 0.224, 0.225]
+    )
+
+    transform_clean = transforms.Compose([*base_transforms, normalization])
     
-    # Pass model directly to the training engine
-    train_and_evaluate(
-        model=resnet_model, 
-        train_loader=train_loader, 
-        clean_val_loader=clean_val_loader, 
-        noisy_val_loader=noisy_val_loader, 
-        higher_order_of_noise_val_loader=higher_order_of_noise_val_loader,
-        device=device, 
-        epochs=wandb.config.epochs,
-        save_interval=wandb.config.save_every_n_epochs,
-        model_save_path=wandb.config.model_save_path,
-        prog_vis=prog_vis,
-        val_dataset=clean_val_dataset,
-        plot_every_n_epochs=wandb.config.plot_every_n_epochs,
-        noise_level=wandb.config.noise_level
+    transform_noise_std1 = transforms.Compose([
+        *base_transforms, 
+        AddGaussianNoise(mean=0.0, std=config.eval_noise_std1), 
+        normalization
+    ])
+    
+    transform_noise_std2 = transforms.Compose([
+        *base_transforms, 
+        AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), 
+        normalization
+    ])
+
+    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    dataset_size = len(train_dataset1)
+    train_size = int(config.train_split_ratio * dataset_size)    
+    generator = torch.Generator().manual_seed(config.seed)
+    indices = torch.randperm(dataset_size, generator=generator).tolist()
+
+    # Slice the indices into Train and Validation groups
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:]
+
+    train_transform = transforms.Compose([
+        *base_transforms,
+        transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob), 
+        normalization
+    ])
+
+
+    train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
+    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
+
+
+    train_loader = DataLoader(
+        train_subset, 
+        batch_size=config.batch_size, 
+        shuffle=True,   
+        num_workers=config.num_workers
     )
     
-    prog_vis.remove_hooks()
+    val_loader = DataLoader(
+        val_subset, 
+        batch_size=config.batch_size, 
+        shuffle=False,  
+        num_workers=config.num_workers
+    )
+
+    val_loader2 = DataLoader(
+        val2_subset, 
+        batch_size=config.batch_size, 
+        shuffle=False, 
+        num_workers=config.num_workers
+    )
+    
+    # 4. Load the Datasets & Loaders
+    print("Loading validation datasets with different noise profiles...")
+    
+    dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+
+    loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+    dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+    dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+    loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+    # 5. Load Pretrained ResNet18
+    print("Downloading/Loading pretrained ResNet18...")
+    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    model = model.to(device)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    criterion = nn.CrossEntropyLoss()
+    
+    # 6. Train and finish
+    train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=NetworkProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
+
+    model.load_state_dict(torch.load(config.best_model_filename))
+    test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
+    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description="Final Test on Noisy Dataset (std=1.0)")
+    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description="Final Test on Noisy Dataset (std=2.0)")
+    wandb.run.summary["final_test_accuracy_clean"] = test_acc_clean
+    wandb.run.summary["final_test_accuracy_noisy1 std=1.0"] = test_acc_noisy1
+    wandb.run.summary["final_test_accuracy_noisy2 std=2.0"] = test_acc_noisy2
+    # End the wandb run
+    print("Training completed. Ending wandb run.")
     wandb.finish()
