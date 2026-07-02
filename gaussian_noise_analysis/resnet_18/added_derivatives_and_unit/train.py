@@ -102,6 +102,13 @@ class EdgeAwareRobustifier(nn.Module):
         x_prepared = self.unet_prep(x_5_channel)
         
         return self.base_resnet(x_prepared)
+    def get_unit_output(self, x):
+        x_smooth = self.denoiser(x)
+        dx, dy = self.compute_derivatives(x_smooth)
+        x_5_channel = torch.cat([x, dx, dy], dim=1)
+        x_prepared = self.unet_prep(x_5_channel)
+        
+        return x_prepared
     
 def train_model(model, config, train_loader, val_loader, val2_loader, criterion, optimizer, device, prog_vis=None):
     """
@@ -136,8 +143,8 @@ def train_model(model, config, train_loader, val_loader, val2_loader, criterion,
             optimizer.zero_grad()
             
             # U-Net Prep Forward Pass
-            outputs_noisy_prep = model.unet_prep(noisy_images)
-            outputs_prep = model.unet_prep(images)
+            outputs_noisy_prep = model.get_unit_output(noisy_images)
+            outputs_prep = model.get_unit_output(images)
             unet_loss = MSE_loss_fn(outputs_noisy_prep, outputs_prep)
             running_unet_loss += unet_loss.item()
 
