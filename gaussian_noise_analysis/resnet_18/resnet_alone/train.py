@@ -340,13 +340,14 @@ if __name__ == "__main__":
     # 5. Load Pretrained ResNet18
     print("Downloading/Loading pretrained ResNet18...")
     model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-    model = model.to(device)
+    
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
     '''model = models.resnet18()
     model.load_state_dict(torch.load("original.pth"))
     model = model.to(device)'''
+    model = model.to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
