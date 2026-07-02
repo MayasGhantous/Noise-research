@@ -196,7 +196,7 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 1.0,
-            "train_noise_prob": 0.,
+            "train_noise_prob": 0.5,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
             "best_model_filename": "noise1.pth",
