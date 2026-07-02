@@ -418,7 +418,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
-    train_model(model, train_loader, val_loader, val_loader2, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=NetworkProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
+    train_model(model, config, train_loader, val_loader, val_loader2, criterion, optimizer, device, prog_vis=NetworkProgressionVisualizer(model))
 
     model.load_state_dict(torch.load(config.best_model_filename))
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
