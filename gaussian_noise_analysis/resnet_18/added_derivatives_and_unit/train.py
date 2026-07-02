@@ -354,7 +354,7 @@ if __name__ == "__main__":
             "train_noise_prob": 0.5,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "kernel3.pth",
+            "best_model_filename": "kernel3_groupnorm8.pth",
             "plot_every_n_epochs": 1,
             "blur_kernel_size": 3,
             "blur_sigma": 0.7,
