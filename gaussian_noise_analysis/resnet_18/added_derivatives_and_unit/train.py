@@ -100,7 +100,7 @@ class EdgeAwareRobustifier(nn.Module):
     def forward(self, x):
         x_smooth = self.denoiser(x)
         dx, dy = self.compute_derivatives(x_smooth)
-        x_5_channel = torch.cat([x_smooth, dx, dy], dim=1)
+        x_5_channel = torch.cat([x, dx, dy], dim=1)
         x_prepared = self.unet_prep(x_5_channel)
         
         return self.base_resnet(x_prepared)
@@ -303,7 +303,7 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="Unet-kenel7",
+        name="Unet-kenel3",
         config={
             "learning_rate": 1e-3,
             "num_epochs": 20,
@@ -317,10 +317,10 @@ if __name__ == "__main__":
             "train_noise_prob": 0.5,
             "eval_noise_std1": 1.0,
             "eval_noise_std2": 2.0,
-            "best_model_filename": "kernel7.pth",
+            "best_model_filename": "kernel3.pth",
             "plot_every_n_epochs": 1,
-            "blur_kernel_size": 7,
-            "blur_sigma": 1.0,
+            "blur_kernel_size": 3,
+            "blur_sigma": 0.7,
             "unet_in_channels": 5,
             "unet_out_channels": 3
         }
@@ -430,7 +430,7 @@ if __name__ == "__main__":
         unet_out=wandb.config.unet_out_channels
     ).to(device)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    optimizer = torch.optim.Adam([{ "params": model.unet_prep.parameters(), "lr": config.learning_rate },{ "params": model.base_resnet.parameters(), "lr": config.learning_rate/100 }])
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
