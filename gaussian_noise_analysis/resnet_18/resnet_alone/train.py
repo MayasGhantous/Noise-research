@@ -187,7 +187,7 @@ if __name__ == "__main__":
         project="Resnet-18",
         name="train_with_noise 1",
         config={
-            "learning_rate": 1e-3,
+            "learning_rate": 1e-6,
             "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
@@ -302,6 +302,7 @@ if __name__ == "__main__":
     #model = model.to(device)
     model = models.resnet18()
     model.load_state_dict(torch.load("original.pth"))
+    model = model.to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
