@@ -342,7 +342,7 @@ if __name__ == "__main__":
         config={
             "learning_rate": 1e-4,
             "num_epochs": 20,
-            "batch_size": 32,
+            "batch_size": 16,
             "num_workers": 2,
             "seed": 42,
             "train_split_ratio": 0.8,
