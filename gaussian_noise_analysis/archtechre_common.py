@@ -10,9 +10,13 @@ import random
 import wandb
 import matplotlib.pyplot as plt
 import numpy as np
-print("setting seeds")
-torch.manual_seed(42)
-np.random.seed(42)
+
+first_time = True
+if first_time:
+    print("setting seeds")
+    torch.manual_seed(42)
+    np.random.seed(42)
+    first_time = False
 
 
 def download_and_extract_imagenette(data_dir="data"):
