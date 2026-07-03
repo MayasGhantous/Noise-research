@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 
+import matplotlib
 import torchvision
     
 parent_dir = str(Path(__file__).parent.parent)
@@ -47,20 +48,27 @@ def analyze(index = 0):
 
 if __name__ == "__main__":
     # Set device
-    saving_location = Path("analysis_results")
+    BASE_DIR = Path(__file__).resolve().parent
+    saving_location = str(BASE_DIR)  +"\\analysis_results"
+    saving_location = Path(saving_location)  # Ensure it's a Path object
     saving_location.mkdir(exist_ok=True)
-    model_name = "noise1_groupnorm1"
+    model_name = "base"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     std1 = 0.5
     std2 = 1.0
     # Load the model
+    train_dir, val_dir = download_and_extract_imagenette(data_dir="./data")
     model = torchvision.models.resnet18()
-    model = replace_bn_with_gn(model, num_groups=1)  # Replace BatchNorm with GroupNorm
-    model.load_state_dict(torch.load(f"C:\\Users\\update\\Documents\\GitHub\\Noise-research\\gaussian_noise_analysis\\resnet_18\\{model_name}.pth"))
+    #model = replace_bn_with_gn(model, num_groups=1)  # Replace BatchNorm with GroupNorm
+    # 1. Get the absolute path to the directory where this python script lives
+    
+
+    # 2. Build the path from the script's location
+    model_path = BASE_DIR / "models" / f"{model_name}.pth"
+    model.load_state_dict(torch.load(model_path))
     model.to(device)
     plot_layer_kernels(model.conv1, begin_idx=0, end_idx=128)  # Visualize the first 64 kernels of the first convolutional layer
     # Load the dataset
-    train_dir, val_dir = download_and_extract_imagenette(data_dir="./data")
 
     base_transforms = [
         transforms.Resize(256),
@@ -100,10 +108,6 @@ if __name__ == "__main__":
     loader_noise2 = DataLoader(dataset_noise2, batch_size=32, shuffle=False, num_workers=2)
 
     #analyze()
-    valid_indices = []
-    for i in range(len(dataset_clean)):
-        if dataset_clean[i][1] == 701:
-            valid_indices.append(i) 
     flags = [True,False]
     for i in range(len(dataset_clean)):  # Analyze the first three images
         success_clean = model(dataset_clean[i][0].unsqueeze(0).to(device)).argmax().item() == dataset_clean[i][1]
@@ -115,6 +119,7 @@ if __name__ == "__main__":
                     if (success_clean == flag1) and (success_noise1 == flag2) and (success_noise2 == flag3):
                         print(f"Analyzing image index {i} with label {dataset_clean[i][1]}...")
                         fig  = analyze(i)
-                        location = saving_location/model_name/f"clean_{flag1}_noise1_{flag2}_noise2_{flag3}"
+                        location = saving_location/model_name/f"clean_{flag1}_noise1_{flag2}_noise2_{flag3}/real_label_{dataset_clean[i][1]}"
                         location.mkdir(parents=True, exist_ok=True)
-                        plt.savefig("./"+str(saving_location/model_name) + f"/clean_{flag1}_noise1_{flag2}_noise2_{flag3}/image_{i}.png", bbox_inches='tight')
+                        plt.savefig(str(saving_location/model_name) + f"/clean_{flag1}_noise1_{flag2}_noise2_{flag3}/real_label_{dataset_clean[i][1]}/image_{i}.png", bbox_inches='tight')
+                        matplotlib.pyplot.close()

@@ -218,7 +218,59 @@ class ViTProgressionVisualizer:
 
         plt.tight_layout()
         return fig
+    
+class ViTGroupNormWrapper(nn.Module):
+    """
+    A wrapper that permutes ViT dimensions to make them compatible 
+    with PyTorch's native GroupNorm computation.
+    """
+    def __init__(self, num_channels, num_groups=1, eps=1e-5):
+        super().__init__()
+        # GroupNorm requires (num_groups, num_channels)
+        self.gn = nn.GroupNorm(num_groups=num_groups, num_channels=num_channels, eps=eps)
 
+    def forward(self, x):
+        # ViT input shape: [Batch, Sequence_Length, Channels]
+        # We must permute to: [Batch, Channels, Sequence_Length] for GroupNorm
+        x = x.permute(0, 2, 1)
+        
+        # Apply GroupNorm
+        x = self.gn(x)
+        
+        # Permute back to original ViT shape: [Batch, Sequence_Length, Channels]
+        x = x.permute(0, 2, 1)
+        return x
+
+def replace_vit_layernorm_with_groupnorm(module, num_groups=1):
+    """
+    Recursively searches a model for nn.LayerNorm and replaces it with 
+    our custom ViTGroupNormWrapper.
+    """
+    for name, child in module.named_children():
+        # If the child is a LayerNorm, replace it
+        if isinstance(child, nn.LayerNorm):
+            
+            # Extract the channel count from the existing LayerNorm
+            if isinstance(child.normalized_shape, int):
+                num_channels = child.normalized_shape
+            else:
+                num_channels = child.normalized_shape[0]
+            
+            # Initialize our wrapper with the correct channels and desired groups
+            replacement = ViTGroupNormWrapper(
+                num_channels=num_channels, 
+                num_groups=num_groups, 
+                eps=child.eps
+            )
+            
+            # Overwrite the LayerNorm layer in the parent module
+            setattr(module, name, replacement)
+            
+        else:
+            # If it's a block or sequential container, recurse deeper
+            replace_vit_layernorm_with_groupnorm(child, num_groups)
+            
+    return module
 
 def main():
     # 1. Configuration & Setup
@@ -273,6 +325,7 @@ def main():
 
     # 3. Load the model
     model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
+    model = replace_vit_layernorm_with_groupnorm(model, num_groups=16).to(device) 
 
     # 6. Run Evaluations
     evaluate_model(model, loader_clean, device, "Baseline (Clean Images)")

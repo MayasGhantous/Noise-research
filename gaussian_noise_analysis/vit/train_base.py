@@ -90,7 +90,7 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="ViT-Noise-Analysis",
-        name="vit_base_no_noisy_train",
+        name="vit_groupnorm16_train",
         config={
             "learning_rate": 1e-4,
             "num_epochs": 3,
@@ -104,8 +104,9 @@ if __name__ == "__main__":
             "train_noise_prob": 0.,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "vit_base_no_noisy_train.pth",
-            "plot_every_n_epochs": 1
+            "best_model_filename": "vit_groupnorm16.pth",
+            "plot_every_n_epochs": 1,
+            "num_groups": 16
         }
     )
     config = wandb.config
@@ -213,6 +214,7 @@ if __name__ == "__main__":
     print("Downloading/Loading pretrained vit...")
     
     model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
+    model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.num_groups)
     
     model = model.to(device)
     
