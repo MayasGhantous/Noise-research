@@ -27,6 +27,7 @@ def main():
             
         }
     )
+    
     config = wandb.config
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -57,8 +58,5 @@ def main():
     print("Training completed. Ending wandb run.")
     wandb.finish()
     
-
-
-
 if __name__ == "__main__":
     main()
