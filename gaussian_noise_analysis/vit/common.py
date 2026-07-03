@@ -108,117 +108,113 @@ def train_val_split(dataset, train_indices, val_indices):
 import torch
 import matplotlib.pyplot as plt
 import math
+import torch
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
 
-class ViTProgressionVisualizer:
-    def __init__(self, model, target_layers=None):
+
+class ViTBatchAttentionVisualizer:
+    def __init__(self, model):
         self.model = model
-        self.activations = {}
-        self.hooks = []
-        # Defaults updated to standard ViT block names
-        self.target_layers = target_layers or ['blocks.0', 'blocks.3', 'blocks.7', 'blocks.11']
-        self._register_hooks()
+        self.attention_weights = None
+        self.hook_handle = None
 
-    def _register_hooks(self):
-        # Changed to named_modules() to easily find nested layers like 'blocks.0'
-        for name, module in self.model.named_modules():
-            if name in self.target_layers:
-                def get_hook(layer_name):
-                    def hook(mod, inp, out):
-                        # Some implementations return tuples, we just need the tensor
-                        if isinstance(out, tuple):
-                            out = out[0]
-                        self.activations[layer_name] = out.detach()
-                    return hook
-                self.hooks.append(module.register_forward_hook(get_hook(name)))
+    def _get_attention_hook(self):
+        def hook(module, input, output):
+            self.attention_weights = output.detach().cpu()
+        return hook
 
-    def remove_hooks(self):
-        for hook in self.hooks:
-            hook.remove()
-
-    def _format_vit_activation(self, act_tensor, feature_map_idx):
-        """Converts ViT token sequence [Batch, Tokens, Dim] into a 2D spatial grid."""
-        act = act_tensor[0] # Grab the first item in the batch
+    def extract_and_return_figure(self, input_batch, true_labels):
+        """
+        Expects:
+        - input_batch: shape [Batch_Size, 3, 224, 224]
+        - true_labels: A tensor or list of the real labels for the batch
+        Returns a Matplotlib Figure object.
+        """
+        batch_size = input_batch.shape[0]
         
-        # Check if it's a 2D token sequence (Tokens x Embed_Dim)
-        if act.dim() == 2: 
-            # 1. Remove the classification token (usually the 0th token)
-            act = act[1:, :] 
-            
-            # 2. Calculate the grid size (e.g., sqrt of 196 is 14)
-            grid_size = int(math.sqrt(act.shape[0]))
-            embed_dim = act.shape[1]
-            
-            # 3. Reshape into [Height, Width, Channels]
-            act = act.reshape(grid_size, grid_size, embed_dim)
-            
-            # 4. Reorder to [Channels, Height, Width] so we can select by index
-            act = act.permute(2, 0, 1) 
-            
-        return act[feature_map_idx].cpu()
+        device = next(self.model.parameters()).device
+        input_batch = input_batch.to(device)
 
-    def plot_comparative_progression(self, clean_img, noisy_img, higher_order_img, true_label, feature_map_idx=0, get_class_name=None, denormalize=None):
-        
-        # Ensure helper functions are defined or passed in
-        get_class_name = get_class_name or (lambda x: str(x))
-        denormalize = denormalize or (lambda x: x)
+        self.model.eval()
 
+        # Register the hook
+        target_layer = self.model.blocks[-1].attn.attn_drop
+        self.hook_handle = target_layer.register_forward_hook(self._get_attention_hook())
+
+        # Forward pass (triggers hook AND gets predictions)
         with torch.no_grad():
-            # Clean inference
-            self.activations.clear()
-            clean_pred = get_class_name(self.model(clean_img).max(1)[1].item())
-            clean_acts = {k: v.clone() for k, v in self.activations.items()}
-            
-            # Noisy inference
-            self.activations.clear()
-            noisy_pred = get_class_name(self.model(noisy_img).max(1)[1].item())
-            noisy_acts = {k: v.clone() for k, v in self.activations.items()}
-        
-            # Higher Order of Noise inference
-            self.activations.clear()
-            higher_order_pred = get_class_name(self.model(higher_order_img).max(1)[1].item())
-            higher_order_acts = {k: v.clone() for k, v in self.activations.items()}
-        
-        num_cols = 1 + len(self.target_layers) 
-        
-        fig, axes = plt.subplots(3, num_cols, figsize=(20, 9))
-        fig.suptitle(f"ViT-Tiny Progression (Feature {feature_map_idx}) | True Class: {get_class_name(true_label)}", fontsize=18)
-        
-        def plot_inputs(axes_row, img, prefix, pred):
-            # Assumes img is shape [1, C, H, W]
-            img_to_plot = denormalize(img)[0].detach().cpu().permute(1, 2, 0)
-            img_to_plot = torch.clamp(img_to_plot, 0, 1) # Prevents matplotlib warnings
-            axes_row[0].imshow(img_to_plot)
-            axes_row[0].set_title(f"{prefix} Input\nPred: {pred}", color='green' if prefix=="Clean" else 'black')
-            axes_row[0].axis('off')
+            outputs = self.model(input_batch)
+            # Calculate the predicted classes dynamically
+            predictions = outputs.argmax(dim=1).cpu()
 
-        plot_inputs(axes[0], clean_img, "Clean", clean_pred)
-        plot_inputs(axes[1], noisy_img, "Noisy", noisy_pred)
-        plot_inputs(axes[2], higher_order_img, "Higher Order", higher_order_pred)
+        self.hook_handle.remove()
 
-        for i, layer_name in enumerate(self.target_layers):
-            col = i + 1 
-            
-            if layer_name in clean_acts:
-                act_c = self._format_vit_activation(clean_acts[layer_name], feature_map_idx)
-                axes[0, col].imshow(act_c, cmap='viridis')
-                axes[0, col].set_title(f"{layer_name}\n{act_c.shape[0]}x{act_c.shape[1]}")
-            axes[0, col].axis('off')
-            
-            if layer_name in noisy_acts:
-                act_n = self._format_vit_activation(noisy_acts[layer_name], feature_map_idx)
-                axes[1, col].imshow(act_n, cmap='viridis')
-                axes[1, col].set_title(f"{layer_name}\n{act_n.shape[0]}x{act_n.shape[1]}")
-            axes[1, col].axis('off')
-                
-            if layer_name in higher_order_acts:
-                act_h = self._format_vit_activation(higher_order_acts[layer_name], feature_map_idx)
-                axes[2, col].imshow(act_h, cmap='viridis')
-                axes[2, col].set_title(f"{layer_name}\n{act_h.shape[0]}x{act_h.shape[1]}")
-            axes[2, col].axis('off')
+        # Process attention maps
+        attn = self.attention_weights 
+        cls_attention = attn[:, :, 0, 1:] 
+        cls_attention = cls_attention.mean(dim=1) 
+        
+        grid_size = int(np.sqrt(cls_attention.shape[1]))
+        cls_attention = cls_attention.reshape(batch_size, grid_size, grid_size)
+        
+        cls_attention = cls_attention.unsqueeze(1)
+        heatmaps = F.interpolate(cls_attention, size=(input_batch.shape[2], input_batch.shape[3]), mode='bilinear', align_corners=False)
+        heatmaps = heatmaps.squeeze(1).numpy() 
+        
+        for i in range(batch_size):
+            h_min, h_max = heatmaps[i].min(), heatmaps[i].max()
+            heatmaps[i] = (heatmaps[i] - h_min) / (h_max - h_min + 1e-8)
 
+        # Ensure true_labels is a list for easy indexing
+        if isinstance(true_labels, torch.Tensor):
+            true_labels = true_labels.cpu().tolist()
+        predictions = predictions.tolist()
+
+        # Return the figure generated by the plotting function
+        return self._create_batch_figure(input_batch.cpu(), heatmaps, true_labels, predictions)
+
+    def _create_batch_figure(self, input_batch, heatmaps, true_labels, predictions):
+        batch_size = input_batch.shape[0]
+        
+        fig, axes = plt.subplots(batch_size, 3, figsize=(15, 5 * batch_size))
+        
+        if batch_size == 1:
+            axes = np.expand_dims(axes, axis=0)
+            
+        for i in range(batch_size):
+            vis_img = denormalize(input_batch[i]).permute(1, 2, 0).numpy()
+            heatmap = heatmaps[i]
+            
+            t_label = true_labels[i]
+            p_label = predictions[i]
+            
+            t_text = get_class_name(t_label)
+            p_text = get_class_name(p_label)
+            
+            # Color code the title: Green if correct, Red if wrong
+            title_color = "green" if t_label == p_label else "red"
+            
+            # Plot 1: Input with Truth & Prediction
+            axes[i, 0].imshow(vis_img)
+            axes[i, 0].set_title(f"True: {t_text} | Pred: {p_text}", color=title_color, fontsize=14, fontweight='bold')
+            axes[i, 0].axis('off')
+            
+            # Plot 2: Heatmap
+            axes[i, 1].imshow(heatmap, cmap='jet')
+            axes[i, 1].set_title("Attention Heatmap", fontsize=12)
+            axes[i, 1].axis('off')
+            
+            # Plot 3: Overlay
+            axes[i, 2].imshow(vis_img)
+            axes[i, 2].imshow(heatmap, cmap='jet', alpha=0.5) 
+            axes[i, 2].set_title("Overlay", fontsize=12)
+            axes[i, 2].axis('off')
+            
         plt.tight_layout()
         return fig
-    
+  
 class ViTGroupNormWrapper(nn.Module):
     """
     A wrapper that permutes ViT dimensions to make them compatible 

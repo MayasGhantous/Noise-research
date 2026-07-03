@@ -63,13 +63,15 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
         if prog_vis and (epoch + 1) % plot_every_n_epochs == 0:
             rand_idx = random.randint(0, len(val_loader.dataset) - 1)
             img, true_label = val_loader.dataset[rand_idx]
+            img2, _ = val_loader2.dataset[rand_idx]
+            img3, _ = val_loader3.dataset[rand_idx]
             
             img_clean = img.unsqueeze(0).to(device)
-            img_noisy = img_clean + torch.randn_like(img_clean) * 1.0
-            img_higher_order = img_clean + torch.randn_like(img_clean) * 2.0
+            img_noisy = img2.unsqueeze(0).to(device)
+            img_higher_order = img3.unsqueeze(0).to(device)
             
             # Generate the plot
-            fig = prog_vis.plot_comparative_progression(img_clean, img_noisy, img_higher_order, true_label, feature_map_idx=5,get_class_name = get_class_name,denormalize = denormalize)
+            fig = prog_vis.extract_and_return_figure(torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
             
             # Log to WandB and close the figure to avoid memory leaks
             wandb.log({f"Network Progression (Feature Map 5)": wandb.Image(fig)})
@@ -222,7 +224,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
-    train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=ViTProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
+    train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=ViTBatchAttentionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
 
     model.load_state_dict(torch.load(config.best_model_filename))
     
