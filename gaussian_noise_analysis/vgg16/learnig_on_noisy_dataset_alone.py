@@ -161,14 +161,6 @@ def train_model(model, train_loader, val_loader, val_loader2, criterion, optimiz
 
     print("Training completed.")
 
-def train_val_split(dataset, train_indices, val_indices):
-    """
-    Splits a dataset into training and validation subsets.
-    """
-    train_subset = Subset(dataset, train_indices)
-    val_subset = Subset(dataset, val_indices)
-    return train_subset, val_subset
-
 if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
@@ -197,78 +189,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # 2. Download and Extract
-    train_dir, test_dir = download_and_extract_imagenette(data_dir="./data")
-
-    # 3. Define Image Transforms (Baseline + Noise Variations)
-    base_transforms = [
-        transforms.Resize(config.image_resize),
-        transforms.CenterCrop(config.image_crop),
-        transforms.ToTensor(),
-    ]
     
-    normalization = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], 
-        std=[0.229, 0.224, 0.225]
-    )
-
-    transform_clean = transforms.Compose([*base_transforms, normalization])
-    
-    transform_noise_std1 = transforms.Compose([
-        *base_transforms, 
-        AddGaussianNoise(mean=0.0, std=config.eval_noise_std1), 
-        normalization
-    ])
-    
-    transform_noise_std2 = transforms.Compose([
-        *base_transforms, 
-        AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), 
-        normalization
-    ])
-
-    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    dataset_size = len(train_dataset1)
-    train_size = int(config.train_split_ratio * dataset_size)    
-    generator = torch.Generator().manual_seed(config.seed)
-    indices = torch.randperm(dataset_size, generator=generator).tolist()
-
-    # Slice the indices into Train and Validation groups
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
-
-    train_transform = transforms.Compose([
-        *base_transforms,
-        transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob), 
-        normalization
-    ])
-
-
-    train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
-    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
-    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
-    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
-
-
-    train_loader = DataLoader(
-        train_subset, 
-        batch_size=config.batch_size, 
-        shuffle=True,   
-        num_workers=config.num_workers
-    )
-    
-    val_loader = DataLoader(
-        val_subset, 
-        batch_size=config.batch_size, 
-        shuffle=False,  
-        num_workers=config.num_workers
-    )
-
-    val_loader2 = DataLoader(
-        val2_subset, 
-        batch_size=config.batch_size, 
-        shuffle=False, 
-        num_workers=config.num_workers
-    )
     
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")

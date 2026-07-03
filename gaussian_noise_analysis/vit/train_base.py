@@ -12,13 +12,14 @@ import random
 
 
 
-def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
+def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criterion, optimizer, device,prog_vis=None,config=None):
     """
     Trains the model on the training dataset and evaluates on the validation dataset.
     """
     print("\nStarting training...")
     best_accuracy = 0.0
-
+    num_epochs = config.num_epochs
+    plot_every_n_epochs = config.plot_every_n_epochs
 
     for epoch in range(num_epochs):
         model.train()
