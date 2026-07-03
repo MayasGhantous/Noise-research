@@ -82,8 +82,6 @@ def evaluate_model(model, dataloader, device, description=""):
         for images, labels in dataloader:
             images = images.to(device)
             labels = labels.to(device)
-            
-
             outputs = model(images)
             _, predicted = torch.max(outputs, 1)
 

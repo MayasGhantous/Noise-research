@@ -176,9 +176,9 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="Resnet-18",
-        name="base_groupnorm16",
+        name="base_groupnorm16_prob5",
         config={
-            "learning_rate": 1e-6,
+            "learning_rate": 1e-4,
             "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
@@ -187,10 +187,10 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 0.5,
-            "train_noise_prob": 0.,
+            "train_noise_prob": 0.5,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "base_groupnorm16.pth",
+            "best_model_filename": "base_groupnorm16_prob5.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": 16,
 
