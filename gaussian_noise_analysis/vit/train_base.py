@@ -66,9 +66,9 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
             img2, _ = val_loader2.dataset[rand_idx]
             img3, _ = val_loader3.dataset[rand_idx]
             
-            img_clean = img.unsqueeze(0).to(device)
-            img_noisy = img2.unsqueeze(0).to(device)
-            img_higher_order = img3.unsqueeze(0).to(device)
+            img_clean = img.squeeze(0).to(device)
+            img_noisy = img2.squeeze(0).to(device)
+            img_higher_order = img3.squeeze(0).to(device)
             
             # Generate the plot
             fig = prog_vis.extract_and_return_figure(torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
