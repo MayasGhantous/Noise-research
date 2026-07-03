@@ -17,8 +17,6 @@ if not os.environ.get("SCRIPT_ALREADY_RAN"):
     np.random.seed(42)
     os.environ["SCRIPT_ALREADY_RAN"] = "True"
 
-print("Running the main script...")
-
 def download_and_extract_imagenette(data_dir="data"):
     #get the absolute path to the parent directory
     parent_dir = str(Path(__file__).parent.parent)
