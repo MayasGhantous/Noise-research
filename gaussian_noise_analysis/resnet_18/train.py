@@ -42,7 +42,7 @@ def main():
     model.load_state_dict(torch.load("original.pth"))
     model = model.to(device)'''
     model = model.to(device)
-    
+    model_visualizer = ResNet18FeatureVisualizer(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
