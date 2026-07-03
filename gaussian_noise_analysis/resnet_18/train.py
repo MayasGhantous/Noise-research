@@ -1,54 +1,49 @@
-import wandb
 import torch
-import torch.nn as nn
-from torchvision import models
-import sys
-from pathlib import Path
-from visualizer import*
+import wandb
+from visualizer import *
 
-parent_dir = str(Path(__file__).parent.parent)
-
-# 2. Add the parent directory to Python's search path
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-from archtechre_common import *
 
 def main():
     wandb.init(
-    project="vgg16_training",
-    name="base_no_noisy_training",
-    config={
-        "learning_rate": 1e-4,
-        "num_epochs": 20,
-        "batch_size": 32,
-        "num_workers": 2,
-        "seed": 42,
-        "train_split_ratio": 0.8,
-        "image_resize": 256,
-        "image_crop": 224,
-        "train_noise_std": 0.5,
-        "train_noise_prob": 0.5,
-        "eval_noise_std1": 0.5,
-        "eval_noise_std2": 1.0,
-        "best_model_filename": "base_no_noisy_training.pth",
-        "plot_every_n_epochs": 1,
-        "group_norm_groups": 16,
-    }
+        project="Resnet-18",
+        name="base1",
+        config={
+            "learning_rate": 1e-4,
+            "num_epochs": 20,
+            "batch_size": 32,
+            "num_workers": 2,
+            "seed": 42,
+            "train_split_ratio": 0.8,
+            "image_resize": 256,
+            "image_crop": 224,
+            "train_noise_std": 0.5,
+            "train_noise_prob": 0.,
+            "eval_noise_std1": 0.5,
+            "eval_noise_std2": 1.0,
+            "best_model_filename": "base1.pth",
+            "plot_every_n_epochs": 1,
+            "group_norm_groups": 16,
+
+            
+        }
     )
     config = wandb.config
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
-    print("Downloading/Loading pretrained VGG16...")
-    weights = models.VGG16_Weights.DEFAULT
-    model = models.vgg16(weights=weights)
+    print("Downloading/Loading pretrained ResNet18...")
+    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    
+    if config.group_norm_groups > 0:
+        print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
+        model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
+    '''model = models.resnet18()
+    model.load_state_dict(torch.load("original.pth"))
+    model = model.to(device)'''
     model = model.to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
-    model_visualizer = VGG16FeatureVisualizer(model)
-    # 6. Train and finish
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
 
     model.load_state_dict(torch.load(config.best_model_filename))
@@ -62,6 +57,8 @@ def main():
     print("Training completed. Ending wandb run.")
     wandb.finish()
     
+
+
 
 if __name__ == "__main__":
     main()

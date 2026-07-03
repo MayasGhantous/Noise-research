@@ -9,6 +9,10 @@ import tarfile
 import random
 import wandb
 import matplotlib.pyplot as plt
+import numpy as np
+print("setting seeds")
+torch.manual_seed(42)
+np.random.seed(42)
 
 
 def download_and_extract_imagenette(data_dir="data"):
