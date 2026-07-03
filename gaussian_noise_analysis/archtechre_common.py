@@ -11,13 +11,13 @@ import wandb
 import matplotlib.pyplot as plt
 import numpy as np
 
-first_time = True
-if first_time:
+if not os.environ.get("SCRIPT_ALREADY_RAN"):
     print("setting seeds")
     torch.manual_seed(42)
     np.random.seed(42)
-    first_time = False
+    os.environ["SCRIPT_ALREADY_RAN"] = "True"
 
+print("Running the main script...")
 
 def download_and_extract_imagenette(data_dir="data"):
     #get the absolute path to the parent directory
