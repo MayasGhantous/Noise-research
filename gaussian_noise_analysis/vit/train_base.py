@@ -92,10 +92,10 @@ if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
         project="ViT-Noise-Analysis",
-        name="orginal_no noise",
+        name="prob 0.5",
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 3,
+            "num_epochs": 20,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -103,10 +103,10 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 0.5,
-            "train_noise_prob": 0.,
+            "train_noise_prob": 0.5,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "vit_no noise.pth",
+            "best_model_filename": "vit_prob_0.5.pth",
             "plot_every_n_epochs": 1,
             "num_groups": 0
         }

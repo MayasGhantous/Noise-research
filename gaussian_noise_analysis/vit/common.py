@@ -201,8 +201,8 @@ class ViTBatchAttentionVisualizer:
             t_label = true_labels[i]
             p_label = predictions[i]
             
-            t_text = class_names[t_label] if class_names else t_label
-            p_text = class_names[p_label] if class_names else p_label
+            t_text = get_class_name(t_label)
+            p_text = get_class_name(p_label)
             
             title_color = "green" if t_label == p_label else "red"
             

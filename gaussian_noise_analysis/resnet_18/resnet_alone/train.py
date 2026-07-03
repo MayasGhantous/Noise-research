@@ -71,10 +71,12 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
         if prog_vis and (epoch + 1) % plot_every_n_epochs == 0:
             rand_idx = random.randint(0, len(val_loader.dataset) - 1)
             img, true_label = val_loader.dataset[rand_idx]
+            img2 = val_loader2.dataset[rand_idx][0]  # Get the corresponding noisy image
+            img3 = val_loader3.dataset[rand_idx][0]  # Get the corresponding higher
             
             img_clean = img.unsqueeze(0).to(device)
-            img_noisy = img_clean + torch.randn_like(img_clean) * 1.0
-            img_higher_order = img_clean + torch.randn_like(img_clean) * 2.0
+            img_noisy = img2.unsqueeze(0).to(device)
+            img_higher_order = img3.unsqueeze(0).to(device)
             
             # Generate the plot
             fig = prog_vis.plot_comparative_progression(img_clean, img_noisy, img_higher_order, true_label, feature_map_idx=5)
