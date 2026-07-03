@@ -1,4 +1,4 @@
-
+from common import *
 import sys
 import torch
 import torch.nn as nn
@@ -8,16 +8,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import wandb
 import random
-from pathlib import Path
 
 
-# 1. Get the absolute path to the parent directory
-parent_dir = str(Path(__file__).parent.parent)
-
-# 2. Add the parent directory to Python's search path
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-from orginal import *
 
 
 def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):
@@ -77,7 +69,7 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
             img_higher_order = img_clean + torch.randn_like(img_clean) * 2.0
             
             # Generate the plot
-            fig = prog_vis.plot_comparative_progression(img_clean, img_noisy, img_higher_order, true_label, feature_map_idx=5)
+            fig = prog_vis.plot_comparative_progression(img_clean, img_noisy, img_higher_order, true_label, feature_map_idx=5,get_class_name = get_class_name,denormalize = denormalize)
             
             # Log to WandB and close the figure to avoid memory leaks
             wandb.log({f"Network Progression (Feature Map 5)": wandb.Image(fig)})
@@ -92,94 +84,16 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
 
     print("Training completed.")
 
-# ==========================================
-# 3. Visualization Utilities
-# ==========================================
-class NetworkProgressionVisualizer:
-    def __init__(self, model, target_layers=None):
-        self.model = model
-        self.activations = {}
-        self.hooks = []
-        self.target_layers = target_layers or ['conv1', 'layer1', 'layer2', 'layer3', 'layer4']
-        self._register_hooks()
-
-    def _register_hooks(self):
-        for name, module in self.model.named_children():
-            if name in self.target_layers:
-                def get_hook(layer_name):
-                    def hook(mod, inp, out):
-                        self.activations[layer_name] = out.detach()
-                    return hook
-                self.hooks.append(module.register_forward_hook(get_hook(name)))
-
-    def remove_hooks(self):
-        for hook in self.hooks:
-            hook.remove()
-
-    def plot_comparative_progression(self, clean_img, noisy_img, higher_order_img, true_label, feature_map_idx=0):
-        with torch.no_grad():
-            # Clean inference
-            self.activations.clear()
-            clean_pred = get_class_name(self.model(clean_img).max(1)[1].item())
-            clean_acts = {k: v.clone() for k, v in self.activations.items()}
-            
-            # Noisy inference
-            self.activations.clear()
-            noisy_pred = get_class_name(self.model(noisy_img).max(1)[1].item())
-            noisy_acts = {k: v.clone() for k, v in self.activations.items()}
-        
-            # Higher Order of Noise inference
-            self.activations.clear()
-            higher_order_pred = get_class_name(self.model(higher_order_img).max(1)[1].item())
-            higher_order_acts = {k: v.clone() for k, v in self.activations.items()}
-        
-        num_cols = 1 + len(self.target_layers) 
-        
-        fig, axes = plt.subplots(3, num_cols, figsize=(20, 9))
-        fig.suptitle(f"ResNet-18 Progression (Feature {feature_map_idx}) | True Class: {get_class_name(true_label)}", fontsize=18)
-        
-        def plot_inputs(axes_row, img, prefix, pred):
-            axes_row[0].imshow(denormalize(img)[0].detach().cpu().permute(1, 2, 0))
-            axes_row[0].set_title(f"{prefix} Input\nPred: {pred}", color='green' if prefix=="Clean" else 'black')
-            axes_row[0].axis('off')
-
-        plot_inputs(axes[0], clean_img, "Clean", clean_pred)
-        plot_inputs(axes[1], noisy_img, "Noisy", noisy_pred)
-        plot_inputs(axes[2], higher_order_img, "Higher Order", higher_order_pred)
-
-        for i, layer_name in enumerate(self.target_layers):
-            col = i + 1 
-            if layer_name in clean_acts:
-                act_c = clean_acts[layer_name][0, feature_map_idx].cpu()
-                axes[0, col].imshow(act_c, cmap='viridis')
-                axes[0, col].set_title(f"{layer_name}\n{act_c.shape[0]}x{act_c.shape[1]}")
-            axes[0, col].axis('off')
-            
-            if layer_name in noisy_acts:
-                act_n = noisy_acts[layer_name][0, feature_map_idx].cpu()
-                axes[1, col].imshow(act_n, cmap='viridis')
-                axes[1, col].set_title(f"{layer_name}\n{act_n.shape[0]}x{act_n.shape[1]}")
-            axes[1, col].axis('off')
-                
-            if layer_name in higher_order_acts:
-                act_h = higher_order_acts[layer_name][0, feature_map_idx].cpu()
-                axes[2, col].imshow(act_h, cmap='viridis')
-                axes[2, col].set_title(f"{layer_name}\n{act_h.shape[0]}x{act_h.shape[1]}")
-            axes[2, col].axis('off')
-
-        plt.tight_layout()
-        return fig
-
 
 
 if __name__ == "__main__":
     # --- Initialize W&B and define all constants in the config ---
     wandb.init(
-        project="Resnet-18",
-        name="base_groupnorm16_prob5",
+        project="ViT-Noise-Analysis",
+        name="vit_base_no_noisy_train",
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 20,
+            "num_epochs": 3,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -187,14 +101,11 @@ if __name__ == "__main__":
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 0.5,
-            "train_noise_prob": 0.5,
+            "train_noise_prob": 0.,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "base_groupnorm16_prob5.pth",
-            "plot_every_n_epochs": 1,
-            "group_norm_groups": 16,
-
-            
+            "best_model_filename": "vit_base_no_noisy_train.pth",
+            "plot_every_n_epochs": 1
         }
     )
     config = wandb.config
@@ -298,32 +209,27 @@ if __name__ == "__main__":
     dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
     loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    # 5. Load Pretrained ResNet18
-    print("Downloading/Loading pretrained ResNet18...")
-    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    # 5. Load Pretrained ViT
+    print("Downloading/Loading pretrained vit...")
     
-    if config.group_norm_groups > 0:
-        print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
-        model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
-    '''model = models.resnet18()
-    model.load_state_dict(torch.load("original.pth"))
-    model = model.to(device)'''
+    model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
+    
     model = model.to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     
     # 6. Train and finish
-    train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=NetworkProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
+    train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, num_epochs=config.num_epochs, prog_vis=ViTProgressionVisualizer(model), plot_every_n_epochs=config.plot_every_n_epochs)
 
     model.load_state_dict(torch.load(config.best_model_filename))
     
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
-    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description="Final Test on Noisy Dataset (std=1.0)")
-    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description="Final Test on Noisy Dataset (std=2.0)")
+    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description="Final Test on Noisy Dataset (std={})".format(config.eval_noise_std1))
+    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description="Final Test on Noisy Dataset (std={})".format(config.eval_noise_std2))
     wandb.run.summary["final_test_accuracy_clean"] = test_acc_clean
-    wandb.run.summary["final_test_accuracy_noisy1 std=1.0"] = test_acc_noisy1
-    wandb.run.summary["final_test_accuracy_noisy2 std=2.0"] = test_acc_noisy2
+    wandb.run.summary["final_test_accuracy_noisy1 std={}".format(config.eval_noise_std1)] = test_acc_noisy1
+    wandb.run.summary["final_test_accuracy_noisy2 std={}".format(config.eval_noise_std2)] = test_acc_noisy2
     # End the wandb run
     print("Training completed. Ending wandb run.")
     wandb.finish()
