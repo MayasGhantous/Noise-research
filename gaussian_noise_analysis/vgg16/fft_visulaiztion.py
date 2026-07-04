@@ -160,5 +160,5 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=2)
     imges , labels = next(iter(train_loader))
     
-    imge = imges[31]
+    imge = imges[8]  # Take the first image in the batch
     plot_tensor_fft_channels(imge)

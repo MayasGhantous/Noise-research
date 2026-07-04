@@ -1,15 +1,20 @@
-import torch
-import wandb
 from visualizer import *
+import sys
+from pathlib import Path
+parent_dir = str(Path(__file__).parent.parent)
 
+# 2. Add the parent directory to Python's search path
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+from Unet import  UNetWrapper
 
-def main(prob,group_norm):
+def main(prob,group_norm,unet):
     wandb.init(
         project="Resnet-18",
-        name="gaussian_resnet18_prob{}_group_norm{}".format(prob, group_norm),
+        name="gaussian_resnet18_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, unet),
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 20,
+            "num_epochs": 5,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -20,10 +25,10 @@ def main(prob,group_norm):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "gaussian_resnet18_prob{}_group_norm{}.pth".format(prob, group_norm),
+            "best_model_filename": "gaussian_resnet18_prob{}_group_norm{}_Unet_{}.pth".format(prob, group_norm, unet),
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
-            
+            "UNet": unet
         }
     )
     
@@ -37,11 +42,16 @@ def main(prob,group_norm):
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
-    '''model = models.resnet18()
-    model.load_state_dict(torch.load("original.pth"))
-    model = model.to(device)'''
+    if config.UNet:
+        print("Wrapping the model with UNet...")
+        model = UNetWrapper(base_model=model)
+    
     model = model.to(device)
-    model_visualizer = ResNet18FeatureVisualizer(model)
+    
+    if config.UNet:
+        model_visualizer = ResNet18FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
+    else:
+        model_visualizer = ResNet18FeatureVisualizer(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
@@ -58,8 +68,14 @@ def main(prob,group_norm):
     wandb.finish()
     
 if __name__ == "__main__":
-    probs = [0.0, 0.5]
-    group_norms = [0, 16]
+    probs = [0.5]
+    group_norms = [16]
+    unet_options = [False,True]
     for prob in probs:
         for group_norm in group_norms:
-            main(prob, group_norm)
+            for unet in unet_options:
+                try:
+                    main(prob, group_norm, unet)
+                except Exception as e:
+                    print(f"An error occurred during training with prob={prob}, group_norm={group_norm}, unet={unet}: {e}")
+                    continue

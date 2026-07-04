@@ -1,18 +1,11 @@
-import wandb
-import torch
-import torch.nn as nn
+from visualizer import*
 import sys
 from pathlib import Path
-import timm
-
-from visualizer import*
-
 parent_dir = str(Path(__file__).parent.parent)
 
 # 2. Add the parent directory to Python's search path
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from archtechre_common import *
 from Unet import  UNetWrapper
 
 

@@ -78,9 +78,13 @@ def main(prob, group_norm,Unet):
 
 if __name__ == "__main__":
     probs = [0.5]
-    group_norms = [0, 16]
-    Unet_options = [True, False]
+    group_norms = [16]
+    Unet_options = [True]
     for prob in probs:
         for group_norm in group_norms:
             for Unet in Unet_options:
-                main(prob=prob, group_norm=group_norm, Unet=Unet)
+                try:
+                    main(prob=prob, group_norm=group_norm, Unet=Unet)
+                except Exception as e:
+                    print(f"An error occurred during training with prob={prob}, group_norm={group_norm}, Unet={Unet}: {e}")
+                    continue
