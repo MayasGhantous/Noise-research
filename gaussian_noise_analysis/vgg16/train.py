@@ -23,8 +23,8 @@ def main(prob, group_norm,Unet):
     project="CNN",
     name="gaussian_CNN_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
     config={
-        "learning_rate": 1e-4,
-        "num_epochs": 20,
+        "learning_rate": 1e-3,
+        "num_epochs": 40,
         "batch_size": 32,
         "num_workers": 2,
         "seed": 42,
@@ -58,7 +58,7 @@ def main(prob, group_norm,Unet):
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-2)
     criterion = nn.CrossEntropyLoss()
     
     if config.UNet:
@@ -82,8 +82,8 @@ def main(prob, group_norm,Unet):
     
 
 if __name__ == "__main__":
-    probs = [0,0.5]
-    group_norms = [8,0, 16, 32]
+    probs = [0.5]
+    group_norms = [0,8, 16]
     Unet_options = [True, False]
     for prob in probs:
         for group_norm in group_norms:
