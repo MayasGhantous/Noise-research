@@ -70,7 +70,7 @@ def main(prob, group_norm):
 
 if __name__ == "__main__":
     probs = [0.0 , 0.5]
-    group_norms = [0, 4, 8, 16]
+    group_norms = [0, 16]
     for prob in probs:
         for group_norm in group_norms:
             main(prob=prob, group_norm=group_norm)
