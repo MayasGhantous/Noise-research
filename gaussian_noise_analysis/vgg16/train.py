@@ -5,7 +5,7 @@ from torchvision import models
 import sys
 from pathlib import Path
 
-from Unet import UNetWrapper
+
 from visualizer import*
 
 parent_dir = str(Path(__file__).parent.parent)
@@ -14,6 +14,7 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
+from Unet import UNetWrapper
 from resnet_18.visualizer import replace_bn_with_gn
 
 def main(prob, group_norm,Unet):
