@@ -24,7 +24,7 @@ def main(prob, group_norm,Unet):
     name="gaussian_CNN_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
     config={
         "learning_rate": 1e-3,
-        "num_epochs": 40,
+        "num_epochs": 20,
         "batch_size": 32,
         "num_workers": 2,
         "seed": 42,
@@ -82,9 +82,10 @@ def main(prob, group_norm,Unet):
     
 
 if __name__ == "__main__":
+    main(prob=0, group_norm=0, Unet=False)
     probs = [0.5]
     group_norms = [0,8, 16]
-    Unet_options = [True, False]
+    Unet_options = [False, True]
     for prob in probs:
         for group_norm in group_norms:
             for Unet in Unet_options:
