@@ -10,6 +10,7 @@ import random
 import wandb
 import matplotlib.pyplot as plt
 import numpy as np
+import tqdm 
 
 if not os.environ.get("SCRIPT_ALREADY_RAN"):
     print("setting seeds")
@@ -273,7 +274,7 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
         correct = 0
         total = 0
 
-        for images, labels in train_loader:
+        for images, labels in tqdm.tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs}"):
             images = images.to(device)
             labels = labels.to(device)
 

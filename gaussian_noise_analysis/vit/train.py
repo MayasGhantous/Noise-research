@@ -44,10 +44,11 @@ def main(prob, group_norm):
     train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
     print("Downloading/Loading pretrained VIT...")
     model = model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
-    model = model.to(device)
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
+    model = model.to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     model_visualizer = ViTBatchAttentionVisualizer(model)
