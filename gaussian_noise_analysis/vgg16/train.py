@@ -24,7 +24,7 @@ def main(prob, group_norm,Unet):
     name="gaussian_CNN_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
     config={
         "learning_rate": 1e-4,
-        "num_epochs": 10,
+        "num_epochs": 20,
         "batch_size": 32,
         "num_workers": 2,
         "seed": 42,
