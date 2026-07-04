@@ -60,6 +60,7 @@ def main(prob, group_norm,Unet):
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
+    
     if config.UNet:
         model_visualizer = VGG16FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
     else:
