@@ -1,5 +1,6 @@
 import torch
 import torchvision.models as models
+import Unet
 
 def count_parameters(model):
     """Counts total and trainable parameters in a PyTorch model."""
@@ -8,8 +9,8 @@ def count_parameters(model):
     return total_params, trainable_params
 
 # Load the models (without pre-trained weights since we just want to count parameters)
-vgg11 = models.efficientnet_b4(weights=None)
-vgg11_bn = models.vgg11_bn(weights=None)
+vgg11 = models.resnet18(weights=None)
+vgg11_bn = Unet.UNetPreProcessor(base_model=models.resnet18(weights=None), in_channels=3, out_channels=3, base_features=16)
 
 # Count parameters for VGG11
 vgg11_total, vgg11_trainable = count_parameters(vgg11)

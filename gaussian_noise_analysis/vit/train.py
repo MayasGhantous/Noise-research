@@ -13,12 +13,13 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
+from Unet import  UNetWrapper
 
 
 def main(prob, group_norm):
     wandb.init(
     project="VIT",
-    name="gaussian_VIT_prob{}_group_norm{}".format(prob, group_norm),
+    name="gaussian_VIT_UNet_prob{}_group_norm{}".format(prob, group_norm),
     config={
         "learning_rate": 1e-4,
         "num_epochs": 20,
@@ -32,9 +33,10 @@ def main(prob, group_norm):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "gaussian_VIT_prob{}_group_norm{}.pth".format(prob, group_norm),
+        "best_model_filename": "gaussian_VIT_UNet_prob{}_group_norm{}.pth".format(prob, group_norm),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
+        "UNet": True  # Added to config
     }
     )
     config = wandb.config
@@ -47,11 +49,17 @@ def main(prob, group_norm):
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
+    if config.UNet:
+        print("Wrapping the model with UNet...")
+        model = UNetWrapper(base_model=model, in_channels=3, out_channels=3, base_features=16)
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
-    model_visualizer = ViTBatchAttentionVisualizer(model)
+    if config.UNet:
+        model_visualizer = ViTBatchAttentionVisualizer(model.get_base_model(), unet=model.get_unet())
+    else:
+        model_visualizer = ViTBatchAttentionVisualizer(model)
     # 6. Train and finish
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
 
@@ -67,8 +75,6 @@ def main(prob, group_norm):
     wandb.finish()
 
 if __name__ == "__main__":
-    probs = [0.0 , 0.5]
-    group_norms = [0, 4, 8, 16]
+    probs = [ 0.5]
     for prob in probs:
-        for group_norm in group_norms:
-            main(prob=prob, group_norm=group_norm)  # You can change the probability and group_norm values as needed
+        main(prob=prob, group_norm=0)  # You can change the probability and group_norm values as needed

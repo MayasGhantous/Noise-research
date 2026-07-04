@@ -5,6 +5,7 @@ from torchvision import models
 import sys
 from pathlib import Path
 
+from Unet import UNetWrapper
 from visualizer import*
 
 parent_dir = str(Path(__file__).parent.parent)
@@ -15,13 +16,13 @@ if parent_dir not in sys.path:
 from archtechre_common import *
 from resnet_18.visualizer import replace_bn_with_gn
 
-def main(prob, group_norm):
+def main(prob, group_norm,Unet):
     wandb.init(
     project="vgg16",
-    name="gaussian_vgg16_prob{}_group_norm{}".format(prob, group_norm),
+    name="gaussian_vgg16_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
     config={
         "learning_rate": 1e-4,
-        "num_epochs": 5,
+        "num_epochs": 10,
         "batch_size": 32,
         "num_workers": 2,
         "seed": 42,
@@ -32,9 +33,10 @@ def main(prob, group_norm):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "gaussian_vgg16_prob{}_group_norm{}.pth".format(prob, group_norm),
+        "best_model_filename": "gaussian_vgg16_prob{}_group_norm{}_Unet_{}.pth".format(prob, group_norm, Unet),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
+        "UNet": Unet
     }
     )
     config = wandb.config
@@ -49,10 +51,15 @@ def main(prob, group_norm):
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
+    if config.UNet:
+        print("Wrapping the model with UNet...")
+        model = UNetWrapper(base_model=model)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     model_visualizer = VGG16FeatureVisualizer(model)
+    if config.UNet:
+        model_visualizer = VGG16FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
     # 6. Train and finish
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
 
@@ -69,8 +76,10 @@ def main(prob, group_norm):
     
 
 if __name__ == "__main__":
-    probs = [0.0 , 0.5]
-    group_norms = [0, 8, 16]
+    probs = [0.5]
+    group_norms = [0, 16]
+    Unet_options = [True, False]
     for prob in probs:
         for group_norm in group_norms:
-            main(prob=prob, group_norm=group_norm)
+            for Unet in Unet_options:
+                main(prob=prob, group_norm=group_norm, Unet=Unet)
