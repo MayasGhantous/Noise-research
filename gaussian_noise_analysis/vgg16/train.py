@@ -45,10 +45,11 @@ def main(prob, group_norm):
     print("Downloading/Loading pretrained VGG16...")
     weights = models.VGG16_BN_Weights.DEFAULT
     model = models.vgg16_bn(weights=weights)
-    model = model.to(device)
+    
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
+    model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     model_visualizer = VGG16FeatureVisualizer(model)
