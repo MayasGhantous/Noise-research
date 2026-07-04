@@ -15,7 +15,6 @@ if not os.environ.get("SCRIPT_ALREADY_RAN"):
     print("setting seeds")
     torch.manual_seed(42)
     np.random.seed(42)
-    os.environ['PYTHONHASHSEED'] = str(42)
     random.seed(42)
     os.environ["SCRIPT_ALREADY_RAN"] = "True"
 

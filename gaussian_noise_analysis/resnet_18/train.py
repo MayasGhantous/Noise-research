@@ -3,10 +3,10 @@ import wandb
 from visualizer import *
 
 
-def main():
+def main(prob,group_norm):
     wandb.init(
         project="Resnet-18",
-        name="base1",
+        name="gaussian_resnet18_prob{}_group_norm{}".format(prob, group_norm),
         config={
             "learning_rate": 1e-4,
             "num_epochs": 20,
@@ -17,13 +17,12 @@ def main():
             "image_resize": 256,
             "image_crop": 224,
             "train_noise_std": 0.5,
-            "train_noise_prob": 0.,
+            "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "best_model_filename": "base1.pth",
+            "best_model_filename": "gaussian_resnet18_prob{}_group_norm{}.pth".format(prob, group_norm),
             "plot_every_n_epochs": 1,
-            "group_norm_groups": 16,
-
+            "group_norm_groups": group_norm,
             
         }
     )
@@ -59,4 +58,8 @@ def main():
     wandb.finish()
     
 if __name__ == "__main__":
-    main()
+    probs = [0.0, 0.5]
+    group_norms = [0, 16]
+    for prob in probs:
+        for group_norm in group_norms:
+            main(prob, group_norm)
