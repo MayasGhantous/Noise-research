@@ -21,7 +21,7 @@ def main(prob, group_norm):
     name="gaussian_vgg16_prob{}_group_norm{}".format(prob, group_norm),
     config={
         "learning_rate": 1e-4,
-        "num_epochs": 20,
+        "num_epochs": 5,
         "batch_size": 32,
         "num_workers": 2,
         "seed": 42,
@@ -70,7 +70,7 @@ def main(prob, group_norm):
 
 if __name__ == "__main__":
     probs = [0.0 , 0.5]
-    group_norms = [0, 16]
+    group_norms = [0, 8, 16]
     for prob in probs:
         for group_norm in group_norms:
             main(prob=prob, group_norm=group_norm)
