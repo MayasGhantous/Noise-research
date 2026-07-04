@@ -5,6 +5,7 @@ from torchvision import models
 import sys
 from pathlib import Path
 
+import network
 
 from visualizer import*
 
@@ -19,8 +20,8 @@ from resnet_18.visualizer import replace_bn_with_gn
 
 def main(prob, group_norm,Unet):
     wandb.init(
-    project="vgg16",
-    name="gaussian_vgg16_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
+    project="CNN",
+    name="gaussian_CNN_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
     config={
         "learning_rate": 1e-4,
         "num_epochs": 10,
@@ -34,7 +35,7 @@ def main(prob, group_norm,Unet):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "gaussian_vgg16_prob{}_group_norm{}_Unet_{}.pth".format(prob, group_norm, Unet),
+        "best_model_filename": "gaussian_CNN_prob{}_group_norm{}_Unet_{}.pth".format(prob, group_norm, Unet),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
         "UNet": Unet
@@ -46,8 +47,9 @@ def main(prob, group_norm,Unet):
     print(f"Using device: {device}")
     train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
     print("Downloading/Loading pretrained VGG16...")
-    weights = models.VGG16_BN_Weights.DEFAULT
-    model = models.vgg16_bn(weights=weights)
+    #weights = models.VGG16_BN_Weights.DEFAULT
+    #model = models.vgg16_bn(weights=weights)
+    model = network.CNN(begin_features=128, group_channels=64, num_classes=1000)
     
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
@@ -77,9 +79,9 @@ def main(prob, group_norm,Unet):
     
 
 if __name__ == "__main__":
-    probs = [0.5]
-    group_norms = [16]
-    Unet_options = [True]
+    probs = [0,0.5]
+    group_norms = [8,0, 16, 32]
+    Unet_options = [True, False]
     for prob in probs:
         for group_norm in group_norms:
             for Unet in Unet_options:
