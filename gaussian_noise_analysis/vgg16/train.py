@@ -4,6 +4,7 @@ import torch.nn as nn
 from torchvision import models
 import sys
 from pathlib import Path
+
 from visualizer import*
 
 parent_dir = str(Path(__file__).parent.parent)
@@ -12,11 +13,12 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
+from resnet_18.visualizer import replace_bn_with_gn
 
-def main():
+def main(prob, group_norm):
     wandb.init(
-    project="vgg16_training",
-    name="base_no_noisy_training",
+    project="vgg16",
+    name="gaussian_vgg16_prob{}_group_norm{}".format(prob, group_norm),
     config={
         "learning_rate": 1e-4,
         "num_epochs": 20,
@@ -27,12 +29,12 @@ def main():
         "image_resize": 256,
         "image_crop": 224,
         "train_noise_std": 0.5,
-        "train_noise_prob": 0.5,
+        "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "base_no_noisy_training.pth",
+        "best_model_filename": "gaussian_vgg16_prob{}_group_norm{}.pth".format(prob, group_norm),
         "plot_every_n_epochs": 1,
-        "group_norm_groups": 16,
+        "group_norm_groups": group_norm,
     }
     )
     config = wandb.config
@@ -41,10 +43,12 @@ def main():
     print(f"Using device: {device}")
     train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
     print("Downloading/Loading pretrained VGG16...")
-    weights = models.VGG16_Weights.DEFAULT
-    model = models.vgg16(weights=weights)
+    weights = models.VGG16_BN_Weights.DEFAULT
+    model = models.vgg16_bn(weights=weights)
     model = model.to(device)
-    
+    if config.group_norm_groups > 0:
+        print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
+        model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
     model_visualizer = VGG16FeatureVisualizer(model)
