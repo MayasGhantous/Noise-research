@@ -60,9 +60,11 @@ def main(prob, group_norm,Unet):
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
-    model_visualizer = VGG16FeatureVisualizer(model)
     if config.UNet:
         model_visualizer = VGG16FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
+    else:
+        model_visualizer = VGG16FeatureVisualizer(model)
+
     # 6. Train and finish
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
 
