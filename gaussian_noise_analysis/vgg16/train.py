@@ -49,7 +49,7 @@ def main(prob, group_norm,Unet):
     print("Downloading/Loading pretrained VGG16...")
     #weights = models.VGG16_BN_Weights.DEFAULT
     #model = models.vgg16_bn(weights=weights)
-    model = network.CNN(begin_features=128, group_channels=64, num_classes=1000)
+    model = network.CNN(begin_features=128, num_classes=1000)
     
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
