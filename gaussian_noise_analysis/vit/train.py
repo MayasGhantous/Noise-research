@@ -1,9 +1,9 @@
 import wandb
 import torch
 import torch.nn as nn
-from torchvision import models
 import sys
 from pathlib import Path
+import timm
 
 from visualizer import*
 
@@ -13,12 +13,12 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
-from resnet_18.visualizer import replace_bn_with_gn
+
 
 def main(prob, group_norm):
     wandb.init(
-    project="vgg16",
-    name="gaussian_vgg16_prob{}_group_norm{}".format(prob, group_norm),
+    project="VIT",
+    name="gaussian_VIT_prob{}_group_norm{}".format(prob, group_norm),
     config={
         "learning_rate": 1e-4,
         "num_epochs": 20,
@@ -32,7 +32,7 @@ def main(prob, group_norm):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "gaussian_vgg16_prob{}_group_norm{}.pth".format(prob, group_norm),
+        "best_model_filename": "gaussian_VIT_prob{}_group_norm{}.pth".format(prob, group_norm),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
     }
@@ -42,16 +42,15 @@ def main(prob, group_norm):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
-    print("Downloading/Loading pretrained VGG16...")
-    weights = models.VGG16_BN_Weights.DEFAULT
-    model = models.vgg16_bn(weights=weights)
+    print("Downloading/Loading pretrained VIT...")
+    model = model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
     model = model.to(device)
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
-        model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
+        model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss()
-    model_visualizer = VGG16FeatureVisualizer(model)
+    model_visualizer = ViTBatchAttentionVisualizer(model)
     # 6. Train and finish
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
 
@@ -65,11 +64,10 @@ def main(prob, group_norm):
     # End the wandb run
     print("Training completed. Ending wandb run.")
     wandb.finish()
-    
 
 if __name__ == "__main__":
     probs = [0.0 , 0.5]
     group_norms = [0, 4, 8, 16]
     for prob in probs:
         for group_norm in group_norms:
-            main(prob=prob, group_norm=group_norm)
+            main(prob=prob, group_norm=group_norm)  # You can change the probability and group_norm values as needed

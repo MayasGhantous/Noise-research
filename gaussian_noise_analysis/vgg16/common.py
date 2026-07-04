@@ -20,12 +20,12 @@ def main():
     std2 = 1.0
     loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=std1, std2=std2)
     print("Downloading/Loading pretrained VGG16...")
-    weights = models.VGG16_Weights.DEFAULT
-    model = models.vgg16(weights=weights)
+    weights = models.VGG16_BN_Weights.DEFAULT
+    model = models.vgg16_bn(weights=weights)
     model = model.to(device)
     evaluate_model(model, loader_clean, device, "Baseline (Clean Images)")
-    evaluate_model(model, loader_noise1, device, "Gaussian Noise (std=0.5)")
-    evaluate_model(model, loader_noise2, device, "Gaussian Noise (std=1.0)")
+    evaluate_model(model, loader_noise1, device, "Gaussian Noise (std={})".format(std1))
+    evaluate_model(model, loader_noise2, device, "Gaussian Noise (std={})".format(std2))
 
 if __name__ == "__main__":
     main()
