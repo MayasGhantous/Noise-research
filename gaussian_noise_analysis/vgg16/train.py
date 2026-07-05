@@ -89,8 +89,4 @@ if __name__ == "__main__":
     for prob in probs:
         for group_norm in group_norms:
             for Unet in Unet_options:
-                try:
-                    main(prob=prob, group_norm=group_norm, Unet=Unet)
-                except Exception as e:
-                    print(f"An error occurred during training with prob={prob}, group_norm={group_norm}, Unet={Unet}: {e}")
-                    continue
+                main(prob=prob, group_norm=group_norm, Unet=Unet)
