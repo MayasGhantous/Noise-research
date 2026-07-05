@@ -205,7 +205,7 @@ class ResNet18FeatureVisualizer:
             self.features.append((layer_name, output.detach().cpu()))
         return hook
 
-    def extract_and_return_figure(self, input_batch, true_labels, class_names=None):
+    def extract_and_return_figure(self, input_batch, true_labels):
         """
         Expects:
         - input_batch: shape [Batch_Size, 3, 224, 224]
@@ -256,10 +256,9 @@ class ResNet18FeatureVisualizer:
             self.features, 
             true_labels, 
             predictions, 
-            class_names
         )
 
-    def _create_batch_figure(self, input_batch, unet_batch, features, true_labels, predictions, class_names):
+    def _create_batch_figure(self, input_batch, unet_batch, features, true_labels, predictions):
         batch_size = input_batch.shape[0]
         num_layers = len(features)  # ResNet will have 5 target layers
         
@@ -282,8 +281,8 @@ class ResNet18FeatureVisualizer:
             p_label = predictions[i]
             
             # Map index to name if available
-            t_text = get_class_name(t_label) if class_names is None and 'get_class_name' in globals() else (class_names.get(t_label, t_label) if class_names else t_label)
-            p_text = get_class_name(p_label) if class_names is None and 'get_class_name' in globals() else (class_names.get(p_label, p_label) if class_names else p_label)
+            t_text = get_class_name(t_label) 
+            p_text = get_class_name(p_label)
             
             title_color = "green" if t_label == p_label else "red"
             
