@@ -9,7 +9,7 @@ if parent_dir not in sys.path:
 from Unet import  UNetWrapper
 
 
-def main(prob, group_norm):
+def main(prob, group_norm, unet):
     wandb.init(
     project="VIT",
     name="gaussian_VIT_UNet_prob{}_group_norm{}".format(prob, group_norm),
@@ -29,7 +29,7 @@ def main(prob, group_norm):
         "best_model_filename": "gaussian_VIT_UNet_prob{}_group_norm{}.pth".format(prob, group_norm),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
-        "UNet": True  # Added to config
+        "UNet": unet  # Added to config
     }
     )
     config = wandb.config
@@ -40,7 +40,7 @@ def main(prob, group_norm):
     print("Downloading/Loading pretrained VIT...")
     model = model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
     if config.group_norm_groups > 0:
-        print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
+        print(f"Replacing LayerNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
     if config.UNet:
         print("Wrapping the model with UNet...")
@@ -68,6 +68,6 @@ def main(prob, group_norm):
     wandb.finish()
 
 if __name__ == "__main__":
-    probs = [ 0.5]
+    probs = [0.5]
     for prob in probs:
-        main(prob=prob, group_norm=0)  # You can change the probability and group_norm values as needed
+        main(prob=prob, group_norm=0, unet=False)  # You can change the probability and group_norm values as needed

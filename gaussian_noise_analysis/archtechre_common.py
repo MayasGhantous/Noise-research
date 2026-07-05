@@ -1,4 +1,5 @@
 from pathlib import Path
+import cv2
 import torch
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
@@ -60,44 +61,60 @@ def get_class_name(class_idx):
 # --- Custom Noise Transform ---
 class AddMotionBlur(object):
     """
-    Custom transform to add motion blur to a tensor with a dynamic random angle.
+    Ultra-fast custom transform to add motion blur using OpenCV precomputed kernels.
     """
-    def __init__(self, kernel_size=15, angle_range=(0.0, 360.0)):
+    def __init__(self, kernel_size=15, angle_range=(0.0, 360.0), num_angles=360):
         """
         Args:
             kernel_size (int): The intensity/length of the blur. Must be an odd number.
-            angle_range (tuple or float): A tuple (min_angle, max_angle) for random angles, 
-                                          or a single float for a fixed angle.
+            angle_range (tuple or float): A tuple (min_angle, max_angle) for random angles.
+            num_angles (int): How many distinct angles to precompute.
         """
         if kernel_size % 2 == 0:
             kernel_size += 1
             
         self.kernel_size = kernel_size
-        self.angle_range = angle_range
+        self.kernels = []
         
-    def __call__(self, tensor):
-        # 1. Determine the angle dynamically for THIS specific image
-        if isinstance(self.angle_range, (tuple, list)):
-            current_angle = random.uniform(self.angle_range[0], self.angle_range[1])
+        # --- PRECOMPUTE OPENCV KERNELS ONCE ---
+        if isinstance(angle_range, (tuple, list)):
+            min_angle, max_angle = angle_range
+            step = (max_angle - min_angle) / max(1, num_angles - 1)
+            angles_to_compute = [min_angle + i * step for i in range(num_angles)]
         else:
-            current_angle = float(self.angle_range)
+            angles_to_compute = [float(angle_range)]
+            
+        for angle in angles_to_compute:
+            # Create a blank numpy kernel
+            kernel = np.zeros((self.kernel_size, self.kernel_size), dtype=np.float32)
+            
+            # Draw the straight line
+            kernel[self.kernel_size // 2, :] = 1.0
+            
+            # Rotate it using OpenCV's highly optimized warpAffine
+            center = (self.kernel_size / 2 - 0.5, self.kernel_size / 2 - 0.5)
+            rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+            kernel = cv2.warpAffine(kernel, rotation_matrix, (self.kernel_size, self.kernel_size))
+            
+            # Normalize
+            kernel = kernel / np.sum(kernel)
+            self.kernels.append(kernel)
 
-        channels, height, width = tensor.shape
+    def __call__(self, tensor):
+        # 1. Grab a random precomputed kernel
+        idx = random.randint(0, len(self.kernels) - 1)
+        kernel = self.kernels[idx]
         
-        # 2. Create and rotate the kernel
-        kernel = torch.zeros((1, self.kernel_size, self.kernel_size), dtype=torch.float32, device=tensor.device)
-        kernel[0, self.kernel_size // 2, :] = 1.0
-        kernel = TF.rotate(kernel, current_angle, interpolation=TF.InterpolationMode.BILINEAR)
-        kernel = kernel / torch.sum(kernel)
+        # 2. Convert PyTorch Tensor [C, H, W] -> Numpy Array [H, W, C]
+        img_np = tensor.permute(1, 2, 0).numpy()
         
-        # 3. Apply the convolution
-        kernel = kernel.expand(channels, 1, self.kernel_size, self.kernel_size)
-        tensor_batched = tensor.unsqueeze(0)
-        padding = self.kernel_size // 2
+        # 3. Apply OpenCV's lightning-fast filter2D (Applies to all channels at once)
+        blurred_np = cv2.filter2D(img_np, -1, kernel)
         
-        blurred_tensor = F.conv2d(tensor_batched, kernel, padding=padding, groups=channels)
+        # 4. Convert back to PyTorch Tensor [H, W, C] -> [C, H, W]
+        blurred_tensor = torch.from_numpy(blurred_np).permute(2, 0, 1)
         
-        return blurred_tensor.squeeze(0) 
+        return blurred_tensor
 class AddGaussianNoise(object):
     """
     Custom transform to add Gaussian noise to a tensor.
@@ -116,7 +133,6 @@ def evaluate_model(model, dataloader, device, description=""):
     """
     Runs the validation loop for a given model and dataloader.
     """
-    print(f"\nStarting evaluation: {description}...")
     correct = 0
     total = 0
 
@@ -124,7 +140,7 @@ def evaluate_model(model, dataloader, device, description=""):
     model.eval()
 
     with torch.no_grad():
-        for images, labels in dataloader:
+        for images, labels in tqdm.tqdm(dataloader, desc=f"Processing {description}"):
             images = images.to(device)
             labels = labels.to(device)
 

@@ -8,7 +8,7 @@ import tqdm
 parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from orginal import *
+from resnet_18.train_motion import *
 from visulaizer import *
 
 def test():

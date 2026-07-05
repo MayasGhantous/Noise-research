@@ -17,7 +17,7 @@ parent_dir = str(Path(__file__).parent.parent)
 # 2. Add the parent directory to Python's search path
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from orginal import *
+from resnet_18.train_motion import *
 
 
 def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criterion, optimizer, device, num_epochs=5,prog_vis=None, plot_every_n_epochs=1):

@@ -143,7 +143,7 @@ if __name__ == "__main__":
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),  # Example motion blur transform
-        #AddMotionBlur(kernel_size=30)
+        AddMotionBlur(kernel_size=20)
     ]
     
     normalization = transforms.Normalize(
@@ -153,12 +153,11 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     np.random.seed(42)
 
-    transform_clean = transforms.Compose([*base_transforms,
-                                          FFTCenterCropResize(50)
+    transform_clean = transforms.Compose([*base_transforms
                                           , normalization,])
     train_set = ImageFolder(root=train_path, transform=transform_clean, target_transform=map_class_to_imagenet)
     train_loader = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=2)
     imges , labels = next(iter(train_loader))
     
-    imge = imges[8]  # Take the first image in the batch
+    imge = imges[1]  # Take the first image in the batch
     plot_tensor_fft_channels(imge)

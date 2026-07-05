@@ -18,7 +18,7 @@ parent_dir = str(Path(__file__).parent.parent)
 # 2. Add the parent directory to Python's search path
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from orginal import *
+from resnet_18.train_motion import *
 
 class DoubleConv(nn.Module):
     """(Conv2d => GroupNorm => ReLU) * 2"""
