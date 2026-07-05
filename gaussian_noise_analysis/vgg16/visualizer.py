@@ -84,7 +84,7 @@ class VGG16FeatureVisualizer:
             class_names
         )
 
-    def _create_batch_figure(self, input_batch, unet_batch, features, true_labels, predictions, class_names):
+    def _create_batch_figure(self, input_batch, unet_batch, features, true_labels, predictions):
         batch_size = input_batch.shape[0]
         num_layers = len(features)  # VGG16 has 13 Conv layers
         
@@ -106,8 +106,8 @@ class VGG16FeatureVisualizer:
             p_label = predictions[i]
             
             # Use your get_class_name function
-            t_text = get_class_name(t_label) if 'get_class_name' in globals() else str(t_label)
-            p_text = get_class_name(p_label) if 'get_class_name' in globals() else str(p_label)
+            t_text = get_class_name(t_label) 
+            p_text = get_class_name(p_label)
             
             title_color = "green" if t_label == p_label else "red"
             
@@ -159,7 +159,7 @@ class VGG16FeatureVisualizer:
         plt.tight_layout()
         return fig
     
-class CustomCNNFeatureVisualizer:
+class CNNFeatureVisualizer:
     def __init__(self, model, unet=None):
         self.model = model
         self.unet = unet
@@ -173,7 +173,7 @@ class CustomCNNFeatureVisualizer:
             self.features.append((layer_name, output.detach().cpu()))
         return hook
 
-    def extract_and_return_figure(self, input_batch, true_labels, class_names=None):
+    def extract_and_return_figure(self, input_batch, true_labels):
         """
         Expects:
         - input_batch: shape [Batch_Size, 3, 224, 224]
@@ -227,10 +227,10 @@ class CustomCNNFeatureVisualizer:
             self.features, 
             true_labels, 
             predictions, 
-            class_names
+
         )
 
-    def _create_batch_figure(self, input_batch, unet_batch, features, true_labels, predictions, class_names):
+    def _create_batch_figure(self, input_batch, unet_batch, features, true_labels, predictions):
         batch_size = input_batch.shape[0]
         num_layers = len(features)  # Dynamically adapts to how many Conv2d layers it found
         
@@ -252,8 +252,8 @@ class CustomCNNFeatureVisualizer:
             p_label = predictions[i]
             
             # Use your get_class_name function
-            t_text = get_class_name(t_label) if 'get_class_name' in globals() else str(t_label)
-            p_text = get_class_name(p_label) if 'get_class_name' in globals() else str(p_label)
+            t_text = get_class_name(t_label) 
+            p_text = get_class_name(p_label)
             
             title_color = "green" if t_label == p_label else "red"
             

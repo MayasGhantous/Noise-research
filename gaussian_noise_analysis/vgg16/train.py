@@ -62,9 +62,9 @@ def main(prob, group_norm,Unet):
     criterion = nn.CrossEntropyLoss()
     
     if config.UNet:
-        model_visualizer = CustomCNNFeatureVisualizer(model.get_base_model(), unet=model.get_unet())
+        model_visualizer = CNNFeatureVisualizer(model.get_base_model(), unet=model.get_unet())
     else:
-        model_visualizer = CustomCNNFeatureVisualizer(model)
+        model_visualizer = CNNFeatureVisualizer(model)
 
     # 6. Train and finish
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)

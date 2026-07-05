@@ -18,7 +18,7 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
-
+'''
 class GradCAM:
     def __init__(self, model, target_layer):
         self.model = model
@@ -117,7 +117,7 @@ def display_multiple_images_progress(model, input_tensors, original_images,label
             
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
-
+'''
 def plot_layer_kernels(layer: nn.Module, begin_idx: int, end_idx: int):
     """
     Plots the kernel weights of a specific PyTorch Conv2d layer.
