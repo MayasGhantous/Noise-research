@@ -51,9 +51,9 @@ def main(prob,group_norm,unet):
     model = model.to(device)
     
     if config.UNet:
-        model_visualizer = CustomCNNFeatureVisualizer(model.get_base_model(), unet=model.get_unet())
+        model_visualizer = CNNFeatureVisualizer(model.get_base_model(), unet=model.get_unet())
     else:
-        model_visualizer = CustomCNNFeatureVisualizer(model)
+        model_visualizer = CNNFeatureVisualizer(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-2)
     criterion = nn.CrossEntropyLoss()
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
