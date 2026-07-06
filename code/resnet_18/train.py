@@ -83,9 +83,6 @@ if __name__ == "__main__":
     noise_type = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
-            main(prob=0, group_norm=0, unet=False, data_name=data_name, noise_type=noise)
-            main(prob=0, group_norm=8, unet=False, data_name=data_name, noise_type=noise)
-            main(prob=0, group_norm=0, unet=True, data_name=data_name, noise_type=noise)
             probs = [0.5]
             group_norms = [0,8]
             unet_options = [False,True]
