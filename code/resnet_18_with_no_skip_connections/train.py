@@ -9,12 +9,17 @@ if parent_dir not in sys.path:
 from Unet import  UNetWrapper
 
 def main(prob, group_norm,Unet,data_name,noise_type):
+    if data_name == "imagenette":
+        num_epochs = 20
+    else:
+        num_epochs = 5
     wandb.init(
-        project="Noise-Research",
-        name="{}_Modifiedresnet18_group_norm{}_Unet_{}".format(noise_type, group_norm, Unet),
+        project="Noise_Research",
+        name="{}_{}_Modifiedresnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, Unet),
+        group="ModifiedResnet18",
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 20,
+            "num_epochs": num_epochs,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -73,16 +78,14 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-  
-
-    probs = [0.5]
-    group_norms = [0,16]
-    unet_options = [False,True]
-    for prob in probs:
-        for group_norm in group_norms:
-            for unet in unet_options:
-                try:
-                    main(prob, group_norm, unet)
-                except Exception as e:
-                    print(f"An error occurred during training with prob={prob}, group_norm={group_norm}, unet={unet}: {e}")
-                    continue
+    data_names = ["gtsrb", "imagenette"]
+    noise_type = ["gaussian", "motion_blur"]
+    for data_name in data_names:
+        for noise in noise_type:
+            probs = [0.5]
+            group_norms = [0,8]
+            unet_options = [False,True]
+            for prob in probs:
+                for group_norm in group_norms:
+                    for unet in unet_options:
+                        main(prob, group_norm, unet, data_name, noise)
