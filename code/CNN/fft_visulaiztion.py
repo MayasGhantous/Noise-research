@@ -13,7 +13,6 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
-from resnet_18.visualizer import replace_bn_with_gn
 
 class FFTCenterCropResize:
     def __init__(self, crop_size, output_size=(244, 244)):
@@ -143,7 +142,7 @@ if __name__ == "__main__":
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),  # Example motion blur transform
-        AddMotionBlur(kernel_size=20)
+        AddMotionBlur(kernel_size=41)
     ]
     
     normalization = transforms.Normalize(

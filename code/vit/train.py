@@ -78,6 +78,14 @@ def main(prob, group_norm, unet, data_name, noise_type):
     wandb.finish()
 
 if __name__ == "__main__":
-    probs = [0.5]
-    for prob in probs:
-        main(prob=prob, group_norm=0, unet=False)  # You can change the probability and group_norm values as needed
+    data_names = ["imagenette"]
+    noise_type = ["gaussian"]
+    for data_name in data_names:
+        for noise in noise_type:
+            probs = [0.5]
+            group_norms = [0,8]
+            unet_options = [False,True]
+            for prob in probs:
+                for group_norm in group_norms:
+                    for unet in unet_options:
+                        main(prob, group_norm, unet, data_name, noise)
