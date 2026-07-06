@@ -14,7 +14,7 @@ def main(prob,group_norm,unet):
         name="gaussian_resnet18_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, unet),
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 5,
+            "num_epochs": 40,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -52,7 +52,7 @@ def main(prob,group_norm,unet):
         model_visualizer = ResNet18FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
     else:
         model_visualizer = ResNet18FeatureVisualizer(model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate,weight_decay=1e-2)
     criterion = nn.CrossEntropyLoss()
     train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device,prog_vis =model_visualizer, config=config)
 
@@ -69,7 +69,7 @@ def main(prob,group_norm,unet):
     
 if __name__ == "__main__":
     probs = [0.5]
-    group_norms = [16]
+    group_norms = [0,8,16]
     unet_options = [False,True]
     for prob in probs:
         for group_norm in group_norms:

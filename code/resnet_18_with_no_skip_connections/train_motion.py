@@ -10,12 +10,16 @@ if parent_dir not in sys.path:
 from Unet import  UNetWrapper
 
 def main(prob,group_norm,unet):
+    if prob == 0: 
+        best_model_name = "motion_base"
+    else:
+        best_model_name = "motion_resnet18_group_norm{}_Unet_{}".format(group_norm, unet)
     wandb.init(
-        project="Resnet-18",
-        name="motion_resnet18_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, unet),
+        project="Resnet-18-no-skip-connection",
+        name=best_model_name,
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 5,
+            "num_epochs": 40,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -25,7 +29,7 @@ def main(prob,group_norm,unet):
             "train_noise_prob": prob,
             "kernel_size1": 20,
             "kernel_size2": 30,
-            "best_model_filename": "motion_resnet18_prob{}_group_norm{}_Unet_{}.pth".format(prob, group_norm, unet),
+            "best_model_filename": "{}.pth".format(best_model_name),
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": unet
@@ -68,8 +72,10 @@ def main(prob,group_norm,unet):
     wandb.finish()
     
 if __name__ == "__main__":
+    main(0,0,False)
+
     probs = [0.5]
-    group_norms = [16]
+    group_norms = [0,8,16]
     unet_options = [False,True]
     for prob in probs:
         for group_norm in group_norms:
