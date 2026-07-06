@@ -12,7 +12,7 @@ def main(prob,group_norm,unet,data_name,noise_type):
     if data_name == "imagenette":
         num_epochs = 20
     else:
-        num_epochs = 5
+        num_epochs = 1
     wandb.init(
         project="Noise_Research",
         group="Resnet_18",
@@ -94,8 +94,6 @@ if __name__ == "__main__":
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        try:
-                            main(prob, group_norm, unet, data_name, noise)
-                        except Exception as e:
-                            print(f"An error occurred during training with prob={prob}, group_norm={group_norm}, unet={unet}, data_name={data_name}, noise_type={noise}: {e}")
-
+                    
+                        main(prob, group_norm, unet, data_name, noise)
+                        
