@@ -5,7 +5,6 @@ import torchvision.transforms as transforms
 from torchvision.models import ResNet18_Weights
 import matplotlib.pyplot as plt
 import numpy as np
-import urllib.request
 from PIL import Image
 import torch.nn as nn
 from torchvision.utils import make_grid
@@ -18,106 +17,8 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
-'''
-class GradCAM:
-    def __init__(self, model, target_layer):
-        self.model = model
-        self.target_layer = target_layer
-        self.model.eval()
-        
-        self.gradients = None
-        self.activations = None
-
-        self.target_layer.register_forward_hook(self.save_activation)
-        self.target_layer.register_full_backward_hook(self.save_gradient)
-
-    def save_activation(self, module, input, output):
-        self.activations = output
-
-    def save_gradient(self, module, grad_input, grad_output):
-        self.gradients = grad_output[0]
-
-    def generate_heatmap(self, input_tensor, target_class=None):
-        output = self.model(input_tensor)
-        
-        if target_class is None:
-            target_class = torch.argmax(output, dim=1).item()
-            
-        self.model.zero_grad()
-        target_score = output[0, target_class]
-        target_score.backward()
-
-        gradients = self.gradients
-        activations = self.activations
-
-        weights = torch.mean(gradients, dim=(2, 3), keepdim=True)
-        cam = torch.sum(weights * activations, dim=1, keepdim=True)
-        cam = F.relu(cam)
-
-        cam = F.interpolate(
-            cam, 
-            size=(input_tensor.shape[2], input_tensor.shape[3]), 
-            mode='bilinear', 
-            align_corners=False
-        )
-
-        cam = cam - cam.min()
-        cam = cam / (cam.max() + 1e-8)
-
-        return cam.squeeze().cpu().detach().numpy()
 
 
-def display_multiple_images_progress(model, input_tensors, original_images,labels, target_layers=None,layer_names=None, figsize=(20, 12)):
-    """
-    Displays Grad-CAM progression for 3 separate images.
-    Creates a 3x5 grid: 3 rows (one per image) and 5 columns (Original + 4 Layers).
-    """
-    if target_layers is None:
-        target_layers = [model.layer1[0],model.layer1[1],model.layer2[0], model.layer2[1], model.layer3[0],model.layer3[1], model.layer4[0], model.layer4[1]]
-    if layer_names is None:
-        layer_names = ["Layer 1.0", "Layer 1.1", "Layer 2.0", "Layer 2.1", "Layer 3.0", "Layer 3.1", "Layer 4.0", "Layer 4.1"]
-
-    # Set up a 3x5 grid figure
-    num_rows = len(input_tensors)
-    num_cols = len(target_layers) + 2  # +2 for the original image and label
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
-    fig.suptitle("Grad-CAM Progression for 3 Images", fontsize=20, y=0.98)
-    
-    cmap = plt.get_cmap('jet')
-    
-    for row in range(num_rows):
-        in_tensor = input_tensors[row]
-        orig_image = original_images[row]
-        label = labels[row]
-        
-        # --- Column 0: Original Image ---
-        axes[row, 0].imshow(orig_image)
-        if row == 0:
-            axes[row, 0].set_title("Original Image", fontsize=14, fontweight='bold')
-        axes[row, 0].axis('off')
-        
-        # --- Column 1: Label ---
-        axes[row, 1].text(0.5, 0.5, label, ha='center', va='center', transform=axes[row, 1].transAxes)
-        axes[row, 1].axis('off')
-
-        # --- Columns 2 to 5: Grad-CAM Layers ---
-        for col, target_layer in enumerate(target_layers):
-            cam_extractor = GradCAM(model, target_layer)
-            heatmap = cam_extractor.generate_heatmap(in_tensor)
-            
-            heatmap_colored = cmap(heatmap)[..., :3]
-            overlay = (0.5 * heatmap_colored) + (0.5 * orig_image)
-            overlay = np.clip(overlay, 0, 1)
-            
-            ax = axes[row, col + 2]
-            ax.imshow(overlay)
-            if row == 0:
-                ax.set_title(layer_names[col], fontsize=14, fontweight='bold')
-            ax.axis('off')
-            
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    return fig
-'''
 def plot_layer_kernels(layer: nn.Module, begin_idx: int, end_idx: int):
     """
     Plots the kernel weights of a specific PyTorch Conv2d layer.

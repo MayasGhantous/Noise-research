@@ -18,10 +18,10 @@ from archtechre_common import *
 from Unet import UNetWrapper
 from resnet_18.visualizer import replace_bn_with_gn
 
-def main(prob, group_norm,Unet):
+def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.init(
-    project="CNN",
-    name="gaussian_CNN_prob{}_group_norm{}_Unet_{}".format(prob, group_norm, Unet),
+    project="Noise-Research",
+    name="{}_CNN_group_norm{}_Unet_{}".format(noise_type, group_norm, Unet),
     config={
         "learning_rate": 1e-3,
         "num_epochs": 20,
@@ -35,18 +35,24 @@ def main(prob, group_norm,Unet):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "gaussian_CNN_prob{}_group_norm{}_Unet_{}.pth".format(prob, group_norm, Unet),
+        "kernel_size1": 20,
+        "kernel_size2": 30,
+        "best_model_filename": "{}_{}_CNN_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
-        "UNet": Unet
+        "UNet": Unet,
+        "data_name": data_name,
+        "noise_type": noise_type
     }
     )
     config = wandb.config
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
-    print("Downloading/Loading pretrained VGG16...")
+    if config.noise_type == "gaussian":
+        train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
+    elif config.noise_type == "motion_blur":
+        train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_motion_blure(config=config)
     #weights = models.VGG16_BN_Weights.DEFAULT
     #model = models.vgg16_bn(weights=weights)
     model = network.CNN( num_classes=1000)
@@ -71,11 +77,11 @@ def main(prob, group_norm,Unet):
 
     model.load_state_dict(torch.load(config.best_model_filename))
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
-    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description=f"Final Test on Noisy Dataset (std={config.eval_noise_std1})")
-    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description=f"Final Test on Noisy Dataset (std={config.eval_noise_std2})")
+    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description=f"Final Test on Noisy Dataset")
+    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description=f"Final Test on higher Noise Dataset")
     wandb.run.summary["final_test_accuracy_clean"] = test_acc_clean
-    wandb.run.summary["final_test_accuracy_noisy1 std={config.eval_noise_std1}"] = test_acc_noisy1
-    wandb.run.summary["final_test_accuracy_noisy2 std={config.eval_noise_std2}"] = test_acc_noisy2
+    wandb.run.summary["final_test_accuracy_noisy1"] = test_acc_noisy1
+    wandb.run.summary["final_test_accuracy_noisy2"] = test_acc_noisy2
     # End the wandb run
     print("Training completed. Ending wandb run.")
     wandb.finish()
