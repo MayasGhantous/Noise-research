@@ -12,7 +12,7 @@ def main(prob,group_norm,unet,data_name,noise_type):
     if data_name == "imagenette":
         num_epochs = 20
     else:
-        num_epochs = 1
+        num_epochs = 5
     wandb.init(
         project="Noise_Research",
         group="Resnet_18",

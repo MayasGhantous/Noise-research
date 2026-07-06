@@ -681,7 +681,7 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
             fig = prog_vis.extract_and_return_figure(torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
             
             # Log to WandB and close the figure to avoid memory leaks
-            wandb.log({f"Network Progression: ": wandb.Image(fig)})
+            wandb.log({f"Network Progression ": wandb.Image(fig)})
             plt.close(fig)
 
         if best_accuracy <= noisy_acc:
