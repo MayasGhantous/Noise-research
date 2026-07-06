@@ -10,7 +10,7 @@ from Unet import  UNetWrapper
 
 def main(prob,group_norm,unet,data_name,noise_type):
     wandb.init(
-        project="Noise-Research",
+        project="Noise-Research",group="Resnet-18",
         name="{}_{}_resnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet),
         config={
             "learning_rate": 1e-4,
