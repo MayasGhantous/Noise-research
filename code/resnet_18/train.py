@@ -9,12 +9,16 @@ if parent_dir not in sys.path:
 from Unet import  UNetWrapper
 
 def main(prob,group_norm,unet,data_name,noise_type):
+    if data_name == "imagenette":
+        num_epochs = 20
+    else:
+        num_epochs = 5
     wandb.init(
         project="Noise-Research",group="Resnet-18",
         name="{}_{}_resnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet),
         config={
             "learning_rate": 1e-4,
-            "num_epochs": 5,
+            "num_epochs": num_epochs,
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
