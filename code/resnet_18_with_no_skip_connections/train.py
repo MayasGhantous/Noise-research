@@ -1,4 +1,4 @@
-from visualizer import *
+
 import sys
 from pathlib import Path
 parent_dir = str(Path(__file__).parent.parent)
@@ -7,6 +7,7 @@ from network import create_resnet18_without_skip
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from Unet import  UNetWrapper
+from resnet_18.visualizer import *
 
 def main(prob, group_norm,Unet,data_name,noise_type):
     if data_name == "imagenette":
@@ -30,6 +31,8 @@ def main(prob, group_norm,Unet,data_name,noise_type):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
+            "kernel_size1": 20,
+            "kernel_size2": 30,
             "best_model_filename": "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
@@ -78,8 +81,8 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_names = ["gtsrb", "imagenette"]
-    noise_type = ["gaussian", "motion_blur"]
+    data_names = ["imagenette"]
+    noise_type = ["gaussian"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
