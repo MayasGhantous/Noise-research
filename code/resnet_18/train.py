@@ -14,11 +14,12 @@ def main(prob,group_norm,unet,data_name,noise_type):
     else:
         num_epochs = 5
     wandb.init(
-        project="Noise-Research",group="Resnet-18",
-        name="{}_{}_resnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet),
+        project="Noise_Research",
+        group="Resnet_18",
+        name=f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}",
         config={
             "learning_rate": 1e-4,
-            "num_epochs": num_epochs,
+            "num_epochs": num_epochs, 
             "batch_size": 32,
             "num_workers": 2,
             "seed": 42,
@@ -31,12 +32,12 @@ def main(prob,group_norm,unet,data_name,noise_type):
             "eval_noise_std2": 1.0,
             "kernel_size1": 20,
             "kernel_size2": 30,
-            "best_model_filename": "{}_{}_resnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, unet),
+            "best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": unet,
             "data_name": data_name,
-            "noise_type": noise_type
+            "noise_type": noise_type 
         }
     )
     
