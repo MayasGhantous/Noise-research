@@ -12,7 +12,7 @@ def main(prob,group_norm,unet):
     if prob == 0: 
         best_model_name = "base"
     else:
-        best_model_name = "gaussian_resnet18_group_norm{}_Unet_{}".format(prob, group_norm, unet)
+        best_model_name = "gaussian_resnet18_group_norm{}_Unet_{}".format( group_norm, unet)
     wandb.init(
         project="Resnet-18-no-skip-connection",
         name=best_model_name,
