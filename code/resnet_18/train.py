@@ -11,7 +11,7 @@ from Unet import  UNetWrapper
 def main(prob,group_norm,unet,data_name,noise_type):
     wandb.init(
         project="Noise-Research",
-        name="{}_resnet18_group_norm{}_Unet_{}".format(noise_type, group_norm, unet),
+        name="{}_{}_resnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet),
         config={
             "learning_rate": 1e-4,
             "num_epochs": 5,
