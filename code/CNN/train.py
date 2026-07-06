@@ -37,7 +37,7 @@ def main(prob, group_norm,Unet,data_name,noise_type):
         "eval_noise_std2": 1.0,
         "kernel_size1": 20,
         "kernel_size2": 30,
-        "best_model_filename": "{}_CNN_prob{}_group_norm{}_Unet_{}.pth".format(noise_type, prob, group_norm, Unet),
+        "best_model_filename": "{}_{}_CNN_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
         "UNet": Unet,

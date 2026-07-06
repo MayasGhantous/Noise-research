@@ -79,9 +79,21 @@ def main(prob,group_norm,unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_name = "gtsrb"
-    noise_type = "gaussian"
-    main(0,0,False,data_name,noise_type)
-    main(0.5,0,True,data_name,noise_type)
-    main(0.5,8,False,data_name,noise_type)
+    data_names = ["gtsrb", "imagenette"]
+    noise_type = ["gaussian", "motion_blur"]
+    for data_name in data_names:
+        for noise in noise_type:
+            main(prob=0, group_norm=0, unet=False, data_name=data_name, noise_type=noise)
+            main(prob=0, group_norm=8, unet=False, data_name=data_name, noise_type=noise)
+            main(prob=0, group_norm=0, unet=True, data_name=data_name, noise_type=noise)
+            probs = [0.5]
+            group_norms = [0,8]
+            unet_options = [False,True]
+            for prob in probs:
+                for group_norm in group_norms:
+                    for unet in unet_options:
+                        try:
+                            main(prob, group_norm, unet, data_name, noise)
+                        except Exception as e:
+                            print(f"An error occurred during training with prob={prob}, group_norm={group_norm}, unet={unet}, data_name={data_name}, noise_type={noise}: {e}")
 
