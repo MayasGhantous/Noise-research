@@ -46,7 +46,7 @@ def main(prob,group_norm,unet,data_name,noise_type):
     
     if config.data_name == "imagenette":
         print("Downloading/Loading pretrained ResNet18...")
-        model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        model = models.resnet18(weights=None)
     else:
         model = models.resnet18(weights=None)
     
