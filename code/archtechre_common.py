@@ -1,4 +1,7 @@
+import csv
 from pathlib import Path
+import shutil
+import zipfile
 import cv2
 import torch
 from torchvision import transforms
@@ -42,6 +45,87 @@ def download_and_extract_imagenette(data_dir="data"):
         print("Dataset already exists locally.")
         
     return os.path.join(extract_path, "train"), os.path.join(extract_path, "val")
+
+
+def prepare_gtsrb_for_imagefolder(data_dir="data"):
+    # Get the absolute path to the parent directory
+    parent_dir = str(Path(__file__).parent.parent)
+    data_dir = os.path.join(parent_dir, data_dir)
+    os.makedirs(data_dir, exist_ok=True)
+    
+    gtsrb_root = os.path.join(data_dir, "GTSRB")
+    
+    # --- 1. DOWNLOAD & EXTRACT TRAINING DATA ---
+    train_zip = os.path.join(data_dir, "GTSRB_Final_Training_Images.zip")
+    train_path = os.path.join(gtsrb_root, "Final_Training", "Images")
+    
+    if not os.path.exists(train_path):
+        print("Downloading Train Data...")
+        url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Training_Images.zip"
+        urllib.request.urlretrieve(url, train_zip)
+        print("Extracting Train Data...")
+        with zipfile.ZipFile(train_zip, "r") as z:
+            z.extractall(data_dir)
+        os.remove(train_zip)
+        
+    # --- 2. DOWNLOAD & EXTRACT RAW TESTING DATA ---
+    test_img_zip = os.path.join(data_dir, "GTSRB_Final_Test_Images.zip")
+    test_gt_zip = os.path.join(data_dir, "GTSRB_Final_Test_GT.zip")
+    raw_test_path = os.path.join(gtsrb_root, "Final_Test", "Images")
+    
+    # Paths for where the CSV *should* go
+    test_csv_dir = os.path.join(gtsrb_root, "Final_Test")
+    test_csv_path = os.path.join(test_csv_dir, "GT-final_test.csv")
+    
+    if not os.path.exists(raw_test_path):
+        print("Downloading Test Images...")
+        url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Test_Images.zip"
+        urllib.request.urlretrieve(url, test_img_zip)
+        print("Extracting Test Images...")
+        with zipfile.ZipFile(test_img_zip, "r") as z:
+            z.extractall(data_dir)
+        os.remove(test_img_zip)
+        
+    if not os.path.exists(test_csv_path):
+        print("Downloading Test Ground Truth CSV...")
+        url = "https://sid.erda.dk/public/archives/daaeac0d7ce1152aea9b61d9f1e19370/GTSRB_Final_Test_GT.zip"
+        urllib.request.urlretrieve(url, test_gt_zip)
+        
+        # FIX: Ensure the Final_Test directory exists, and extract the CSV specifically into it
+        os.makedirs(test_csv_dir, exist_ok=True)
+        with zipfile.ZipFile(test_gt_zip, "r") as z:
+            z.extractall(test_csv_dir) 
+        os.remove(test_gt_zip)
+
+    # --- 3. FORMAT TESTING DATA FOR IMAGEFOLDER ---
+    formatted_test_path = os.path.join(gtsrb_root, "Test_ImageFolder")
+    
+    if not os.path.exists(formatted_test_path):
+        print("Organizing test images into class folders for ImageFolder...")
+        os.makedirs(formatted_test_path)
+        
+        with open(test_csv_path, 'r') as f:
+            reader = csv.DictReader(f, delimiter=';')
+            for row in reader:
+                filename = row['Filename']
+                class_id = row['ClassId']
+                
+                class_folder = f"{int(class_id):05d}"
+                
+                src_path = os.path.join(raw_test_path, filename)
+                dst_dir = os.path.join(formatted_test_path, class_folder)
+                dst_path = os.path.join(dst_dir, filename)
+                
+                os.makedirs(dst_dir, exist_ok=True)
+                
+                if os.path.exists(src_path):
+                    shutil.copy(src_path, dst_path)
+                    
+        print("Test data formatted successfully.")
+    else:
+        print("Dataset already downloaded and formatted.")
+
+    return train_path, formatted_test_path
 
 # --- Class Mapping Dictionaries & Functions ---
 IMAGENETTE_CLASSES = {
@@ -165,9 +249,12 @@ def denormalize(tensor):
     return torch.clamp(tensor, 0, 1)
 
 
-def get_test_loaders_for_gaussian(batch_size=32,std1=0.5,std2=1):
+def get_test_loaders_for_gaussian(batch_size=32,std1=0.5,std2=1,data_name = "imagenette"):
 
-    _, val_dir = download_and_extract_imagenette()
+    if data_name == "imagenette":
+        _, val_dir = download_and_extract_imagenette()
+    elif data_name == "gtsrb":
+        _, val_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
     # We apply noise AFTER converting to tensor but BEFORE normalization, 
@@ -213,9 +300,12 @@ def get_test_loaders_for_gaussian(batch_size=32,std1=0.5,std2=1):
 
 
 
-def get_test_loaders_for_motion_blur(batch_size=32,kernel_size1=15,kernel_size2=25):
+def get_test_loaders_for_motion_blur(batch_size=32,kernel_size1=15,kernel_size2=25,data_name = "imagenette"):
 
-    _, val_dir = download_and_extract_imagenette()
+    if data_name == "imagenette":
+        _, val_dir = download_and_extract_imagenette()
+    elif data_name == "gtsrb":
+        _, val_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
     # We apply noise AFTER converting to tensor but BEFORE normalization, 
@@ -247,15 +337,25 @@ def get_test_loaders_for_motion_blur(batch_size=32,kernel_size1=15,kernel_size2=
 
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
-    
-    dataset_clean = ImageFolder(root=val_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
+    if data_name == "imagenette":
+            
+        dataset_clean = ImageFolder(root=val_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+        loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
+        dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    dataset_noise2 = ImageFolder(root=val_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
+        dataset_noise2 = ImageFolder(root=val_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
+    else:
+        dataset_clean = ImageFolder(root=val_dir, transform=transform_clean)
+        loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
+
+        dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
+
+        dataset_noise2 = ImageFolder(root=val_dir, transform=transform_noise_std2)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return loader_clean, loader_noise1, loader_noise2
 
@@ -272,7 +372,10 @@ def train_val_split(dataset, train_indices, val_indices):
 
 
 def get_traing_val_test_loaders_for_gaussian(config):
-    train_dir, test_dir = download_and_extract_imagenette()
+    if config.data_name == "imagenette":
+        train_dir, test_dir = download_and_extract_imagenette()
+    elif config.data_name == "gtsrb":
+        train_dir, test_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
     base_transforms = [
@@ -299,8 +402,11 @@ def get_traing_val_test_loaders_for_gaussian(config):
         AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), 
         normalization
     ])
-
-    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    if config.data_name == "imagenette":
+        train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    else:
+        train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1)
+                                     
     dataset_size = len(train_dataset1)
     train_size = int(config.train_split_ratio * dataset_size)    
     generator = torch.Generator().manual_seed(config.seed)
@@ -316,15 +422,24 @@ def get_traing_val_test_loaders_for_gaussian(config):
         normalization
     ])
 
+    if config.data_name == "imagenette":
+        train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+        train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
+        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
 
-    train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
-    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
-    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
-    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
+        train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
+    else:
+        train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean)
+        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+        train_dataset3 = ImageFolder(root=train_dir, transform=train_transform)
+        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
 
-    train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)#
+        train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2)
+        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
 
     train_loader = DataLoader(
         train_subset, 
@@ -356,21 +471,35 @@ def get_traing_val_test_loaders_for_gaussian(config):
     
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
-    
-    dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
 
-    loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    if config.data_name == "imagenette":
 
-    dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+        dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
 
-    dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+        loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    else:
+        dataset_clean = ImageFolder(root=test_dir, transform=transform_clean)
+        loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
 
 
 def get_traing_val_test_loaders_for_motion_blure(config):
-    train_dir, test_dir = download_and_extract_imagenette()
+    if config.data_name == "imagenette": 
+        train_dir, test_dir = download_and_extract_imagenette()
+    elif config.data_name == "gtsrb":
+        train_dir, test_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
     base_transforms = [
@@ -397,8 +526,10 @@ def get_traing_val_test_loaders_for_motion_blure(config):
         AddMotionBlur(kernel_size=config.kernel_size2), 
         normalization
     ])
-
-    train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    if config.data_name == "imagenette":
+        train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+    else:
+        train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1)
     dataset_size = len(train_dataset1)
     train_size = int(config.train_split_ratio * dataset_size)    
     generator = torch.Generator().manual_seed(config.seed)
@@ -414,15 +545,25 @@ def get_traing_val_test_loaders_for_motion_blure(config):
         normalization
     ])
 
+    if config.data_name == "imagenette":
+        train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+        train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
+        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
 
-    train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
-    _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
-    train_dataset3 = ImageFolder(root=train_dir, transform=train_transform, target_transform=map_class_to_imagenet)
-    train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
+        train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)#
+    else:
 
-    train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)#
+        train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean)
+        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
+        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
+        train_dataset3 = ImageFolder(root=train_dir, transform=train_transform)
+        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)#train
+
+        train_dataset4 = ImageFolder(root=train_dir, transform=transform_noise_std2)
+        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)#
 
     train_loader = DataLoader(
         train_subset, 
@@ -454,16 +595,26 @@ def get_traing_val_test_loaders_for_motion_blure(config):
     
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
-    
-    dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
 
-    loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    if config.data_name == "imagenette":
+        dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
 
-    dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+        loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+        dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    else:
+        dataset_clean = ImageFolder(root=test_dir, transform=transform_clean)
+        loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise1 = ImageFolder(root=test_dir, transform=transform_noise_std1)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+        dataset_noise2 = ImageFolder(root=test_dir, transform=transform_noise_std2)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
 
 
@@ -530,7 +681,7 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
             fig = prog_vis.extract_and_return_figure(torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
             
             # Log to WandB and close the figure to avoid memory leaks
-            wandb.log({f"Network Progression (Feature Map 5)": wandb.Image(fig)})
+            wandb.log({f"Network Progression: ": wandb.Image(fig)})
             plt.close(fig)
 
         if best_accuracy <= noisy_acc:
@@ -906,4 +1057,7 @@ def plot_tensor_fft_channels(image_tensor):
         axes[1, i+1].axis('off')
         
     plt.tight_layout()
-    plt.show()    
+    plt.show()   
+    
+if __name__ == "__main__":
+    train_loader, val_loader, test_loader = get_traing_val_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name="gtsrb")

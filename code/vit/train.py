@@ -9,10 +9,10 @@ if parent_dir not in sys.path:
 from Unet import  UNetWrapper
 
 
-def main(prob, group_norm, unet):
+def main(prob, group_norm, unet, data_name, noise_type):
     wandb.init(
-    project="VIT",
-    name="gaussian_VIT_UNet_prob{}_group_norm{}".format(prob, group_norm),
+    project="Noise-Research",
+    name="{}_VIT_group_norm{}_Unet_{}".format(noise_type, group_norm, unet),
     config={
         "learning_rate": 1e-4,
         "num_epochs": 20,
@@ -26,19 +26,29 @@ def main(prob, group_norm, unet):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "best_model_filename": "gaussian_VIT_UNet_prob{}_group_norm{}.pth".format(prob, group_norm),
+        "kernel_size1": 20,
+        "kernel_size2": 30,
+        "best_model_filename": "{}_{}_VIT_prob{}_group_norm{}.pth".format(data_name, noise_type, prob, group_norm),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
-        "UNet": unet  # Added to config
+        "UNet": unet,
+        "data_name": data_name,
+        "noise_type": noise_type
     }
     )
     config = wandb.config
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
+    if config.noise_type == "gaussian":
+        train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
+    elif config.noise_type == "motion_blur":
+        train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_motion_blure(config=config)
     print("Downloading/Loading pretrained VIT...")
-    model = model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
+    if config.data_name == "gtsrb":
+        model = timm.create_model('vit_tiny_patch16_224', pretrained=False).to(device)
+    else:
+        model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
     if config.group_norm_groups > 0:
         print(f"Replacing LayerNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
@@ -58,11 +68,11 @@ def main(prob, group_norm, unet):
 
     model.load_state_dict(torch.load(config.best_model_filename))
     test_acc_clean = evaluate_model(model, loader_clean, device, description="Final Test on Clean Dataset")
-    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description=f"Final Test on Noisy Dataset (std={config.eval_noise_std1})")
-    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description=f"Final Test on Noisy Dataset (std={config.eval_noise_std2})")
+    test_acc_noisy1 = evaluate_model(model, loader_noise1, device, description=f"Final Test on Noisy Dataset")
+    test_acc_noisy2 = evaluate_model(model, loader_noise2, device, description=f"Final Test on Noisy Dataset")
     wandb.run.summary["final_test_accuracy_clean"] = test_acc_clean
-    wandb.run.summary["final_test_accuracy_noisy1 std={config.eval_noise_std1}"] = test_acc_noisy1
-    wandb.run.summary["final_test_accuracy_noisy2 std={config.eval_noise_std2}"] = test_acc_noisy2
+    wandb.run.summary["final_test_accuracy_noisy1"] = test_acc_noisy1
+    wandb.run.summary["final_test_accuracy_noisy2"] = test_acc_noisy2
     # End the wandb run
     print("Training completed. Ending wandb run.")
     wandb.finish()
