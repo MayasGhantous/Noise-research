@@ -107,7 +107,7 @@ def main(prob, group_norm, unet, data_name, noise_type):
 
 if __name__ == "__main__":
     data_names = ["gtsrb","imagenette"]
-    noise_type = ["gaussian"]
+    noise_type = ["gaussian","motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
