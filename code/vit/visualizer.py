@@ -1,11 +1,7 @@
 
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-from torchvision.datasets import ImageFolder
-from torch.utils.data import DataLoader
-import timm
 import torch.nn.functional as F
 import numpy as np
 import sys
@@ -15,6 +11,7 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
+
 class ViTBatchAttentionVisualizer:
     def __init__(self, model, unet=None):
         self.model = model
@@ -162,7 +159,7 @@ class ViTBatchAttentionVisualizer:
             
         plt.tight_layout()
         return fig
-  
+
 class ViTGroupNormWrapper(nn.Module):
     """
     A wrapper that permutes ViT dimensions to make them compatible 
