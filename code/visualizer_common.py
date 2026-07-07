@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -58,7 +60,9 @@ def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,dev
                 dictionary[flag1][flag2] = {}
                 for flag3 in flags:
                     dictionary[flag1][flag2][flag3] = {}
+                    dictionary[flag1][flag2][flag3]["list"] = []
                     for labels in IMAGENETTE_CLASSES.keys():
+                        #create an empty file
                         dictionary[flag1][flag2][flag3][labels] = 0
 
     for batch_clean, batch_noise1, batch_noise2 in tqdm.tqdm(zip(loader_clean, loader_noise1, loader_noise2)):
@@ -89,12 +93,12 @@ def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,dev
             flag1 = flag1.item()
             flag2 = flag2.item()
             flag3 = flag3.item()
+            dictionary[flag1][flag2][flag3]["list"].append(i)
             if dictionary[flag1][flag2][flag3][labels_clean[j].item()] < max_samples:
                 dictionary[flag1][flag2][flag3][labels_clean[j].item()] += 1
                 save_path = Path(saving_location + f"/{flag1}_{flag2}_{flag3}/realLabel_{get_class_name(labels_clean[j].item())}")
                 save_path.mkdir(parents=True, exist_ok=True)
                 save_path = str(save_path)
-            
                 fig = analyze_batches(
                     model,
                     images_clean, preds_clean,
@@ -114,6 +118,11 @@ def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,dev
                 fig.savefig(f"{save_path}/feature_maps_{i}.png")
                 plt.close(fig)  
             i += 1
+    for flag1 in flags:
+        for flag2 in flags:
+            for flag3 in flags:
+                with open(saving_location + f"/{flag1}_{flag2}_{flag3}/index_dictionary.json", 'w') as f:
+                    json.dump(dictionary[flag1][flag2][flag3]["list"], f, indent=4)
 
 class GradCAM:
     def __init__(self, model, target_layer):
@@ -428,14 +437,14 @@ def display_multiple_images_fft_progress(model, input_tensors, original_images, 
 
 
 
-def save_fft_map_for_an_index(model_name,group_norm,unet, index,gaussian, saving_location,load_model,models_location= str(Path(__file__).parent)+"/models"):
+def save_fft_map_for_an_index(model_name,group_norm,unet, index,gaussian, saving_location,load_model,models_location):
     if gaussian:
         loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0)
     else:
         loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=20, kernel_size2=30)
     model = load_model(model_name,group_norm,unet,models_location)
     model.eval()
-    
+
     sample_images = []
     sample_tensors = []
     
@@ -443,7 +452,7 @@ def save_fft_map_for_an_index(model_name,group_norm,unet, index,gaussian, saving
     img_noise1 = loader_noise1.dataset[index][0]
     img_noise2 = loader_noise2.dataset[index][0]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+    model = model.to(device)
     sample_images.append(denormalize(img_clean.cpu()).permute(1, 2, 0).numpy())
     sample_tensors.append(img_clean.unsqueeze(0).to(device))
     
@@ -461,6 +470,6 @@ def save_fft_map_for_an_index(model_name,group_norm,unet, index,gaussian, saving
 
             
     fig = display_multiple_images_fft_progress(model,sample_tensors, sample_images, predicted_labels)
-    Path(saving_location).mkdir(parents=True, exist_ok=True)
-    fig.savefig(saving_location+f"/fft_map_index_{index}.png")
+    Path(saving_location+f"/{model_name}/fft").mkdir(parents=True, exist_ok=True)
+    fig.savefig(saving_location+f"/{model_name}/fft/fft_map_index_{index}.png")
 
