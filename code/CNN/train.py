@@ -39,7 +39,7 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     else:
         num_epochs = 5
     wandb.init(
-    project="Noise-Research",
+    project=project_name,
     name=target_run_name,
     group="CNN",
     id=run_id,

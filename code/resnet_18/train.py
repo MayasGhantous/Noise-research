@@ -24,7 +24,7 @@ def main(prob,group_norm,unet,data_name,noise_type):
     else:
         num_epochs = 5
     wandb.init(
-        project="Noise_Research",
+        project=project_name,
         group="Resnet_18",
         name=target_run_name,
         id=run_id,
