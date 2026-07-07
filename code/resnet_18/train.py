@@ -6,7 +6,11 @@ from torchvision import models
 def main(prob,group_norm,unet,data_name,noise_type):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
-    target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+    if prob == 0.5:
+        target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+    else:
+        target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+    target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
     found_run = False
@@ -20,9 +24,10 @@ def main(prob,group_norm,unet,data_name,noise_type):
         run_id = wandb.util.generate_id()
         print("No existing run found. Starting a new one.")
     if data_name == "imagenette":
-        num_epochs = 20
+        num_epochs = 5
     else:
         num_epochs = 5
+    
     wandb.init(
         project=project_name,
         group="Resnet_18",
@@ -44,7 +49,8 @@ def main(prob,group_norm,unet,data_name,noise_type):
             "eval_noise_std2": 1.0,
             "kernel_size1": 101,
             "kernel_size2": 151,
-            "best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
+            #"best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
+            "best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": unet,
@@ -98,7 +104,9 @@ def main(prob,group_norm,unet,data_name,noise_type):
     
 if __name__ == "__main__":
     data_names = ["gtsrb", "imagenette"]
-    noise_type = ["motion_blur"]
+    for data_name in data_names:
+        main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type="gaussian")
+    '''noise_type = ["motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
@@ -108,4 +116,5 @@ if __name__ == "__main__":
                 for group_norm in group_norms:
                     for unet in unet_options:
                         main(prob, group_norm, unet, data_name, noise)
+    '''
                         

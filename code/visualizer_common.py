@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from archtechre_common import *
 
-def analyze_batches(model, 
+def analyze_batches(data_name, model, 
                     batch_clean_images, batch_clean_preds,
                     batch_noise1_images, batch_noise1_preds,
                     batch_noise2_images, batch_noise2_preds,device,index):
@@ -36,9 +36,9 @@ def analyze_batches(model,
     sample_tensors.append(img_noise2.unsqueeze(0).to(device))
     
     predicted_labels = [
-        get_class_name(batch_clean_preds[index].item()),
-        get_class_name(batch_noise1_preds[index].item()),
-        get_class_name(batch_noise2_preds[index].item())
+        get_class_name(data_name=data_name, class_idx=batch_clean_preds[index].item()),
+        get_class_name(data_name=data_name, class_idx=batch_noise1_preds[index].item()),
+        get_class_name(data_name=data_name, class_idx=batch_noise2_preds[index].item())
     ]
 
     fig = display_multiple_images_progress(model, sample_tensors, sample_images, predicted_labels)
@@ -48,7 +48,7 @@ def analyze_batches(model,
 
 
 
-def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,device, saving_location,max_samples=5):
+def save_figures(data_name, model, visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location, max_samples=5):
     i = 0
     dictionary = {}
     
@@ -61,9 +61,14 @@ def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,dev
                 for flag3 in flags:
                     dictionary[flag1][flag2][flag3] = {}
                     dictionary[flag1][flag2][flag3]["list"] = []
-                    for labels in IMAGENETTE_CLASSES.keys():
-                        #create an empty file
-                        dictionary[flag1][flag2][flag3][labels] = 0
+                    if data_name == IMAGENETTE:
+                        for labels in IMAGENETTE_CLASSES.keys():
+                            #create an empty file
+                            dictionary[flag1][flag2][flag3][labels] = 0
+                    elif data_name == GTSRB:
+                        for labels in GTSRB_CLASSES.keys():
+                            #create an empty file
+                            dictionary[flag1][flag2][flag3][labels] = 0
 
     for batch_clean, batch_noise1, batch_noise2 in tqdm.tqdm(zip(loader_clean, loader_noise1, loader_noise2)):
         # 1. Unpack batches
@@ -94,12 +99,16 @@ def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,dev
             flag2 = flag2.item()
             flag3 = flag3.item()
             dictionary[flag1][flag2][flag3]["list"].append(i)
-            if dictionary[flag1][flag2][flag3][labels_clean[j].item()] < max_samples:
-                dictionary[flag1][flag2][flag3][labels_clean[j].item()] += 1
-                save_path = Path(saving_location + f"/{flag1}_{flag2}_{flag3}/realLabel_{get_class_name(labels_clean[j].item())}")
+            if i ==5:
+                print("aha")
+            label = labels_clean[j].item()
+            if dictionary[flag1][flag2][flag3][label] < max_samples:
+                dictionary[flag1][flag2][flag3][label] += 1
+                save_path = Path(saving_location + f"/{flag1}_{flag2}_{flag3}/realLabel_{get_class_name(data_name=data_name, class_idx=label)}")
                 save_path.mkdir(parents=True, exist_ok=True)
                 save_path = str(save_path)
                 fig = analyze_batches(
+                   data_name,
                     model,
                     images_clean, preds_clean,
                     images_noise1, preds_noise1,
@@ -114,7 +123,7 @@ def save_figures(model,visualizer,loader_clean, loader_noise1, loader_noise2,dev
                 true_label = labels_clean[j].item()
 
                 # Generate the plot
-                fig = visualizer.extract_and_return_figure(torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
+                fig = visualizer.extract_and_return_figure(data_name,torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
                 fig.savefig(f"{save_path}/feature_maps_{i}.png")
                 plt.close(fig)  
             i += 1
@@ -437,7 +446,7 @@ def display_multiple_images_fft_progress(model, input_tensors, original_images, 
 
 
 
-def save_fft_map_for_an_index(dataset_name, model_name, group_norm, unet, index, gaussian, saving_location, load_model, models_location):
+def save_fft_map_for_an_index(data_name, model_name, group_norm, unet, index, gaussian, saving_location, load_model, models_location):
     if gaussian:
         loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, dataset_name=dataset_name)
     else:
@@ -463,9 +472,9 @@ def save_fft_map_for_an_index(dataset_name, model_name, group_norm, unet, index,
     sample_tensors.append(img_noise2.unsqueeze(0).to(device))
     
     predicted_labels = [
-        get_class_name(loader_clean.dataset[index][1]),
-        get_class_name(loader_noise1.dataset[index][1]),
-        get_class_name(loader_noise2.dataset[index][1])
+        get_class_name(data_name=data_name, class_idx=loader_clean.dataset[index][1]),
+        get_class_name(data_name=data_name, class_idx=loader_noise1.dataset[index][1]),
+        get_class_name(data_name=data_name, class_idx=loader_noise2.dataset[index][1])
     ]
 
             

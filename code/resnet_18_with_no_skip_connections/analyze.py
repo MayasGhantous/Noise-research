@@ -21,9 +21,9 @@ def load_model(model_name,group_norm,unet,models_location):
 
 def main(dataset_name, model_name, group_norm, unet, gaussian, models_location = str(Path(__file__).parent)+"/models"):
     if gaussian:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, dataset_name=dataset_name)
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=dataset_name)
     else:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=101, kernel_size2=151, dataset_name=dataset_name)
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=101, kernel_size2=151, data_name=dataset_name)
     model = load_model(model_name,group_norm,unet,models_location)
     model.eval()
     if(unet):

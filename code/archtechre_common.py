@@ -15,6 +15,8 @@ import wandb
 import matplotlib.pyplot as plt
 import numpy as np
 import tqdm 
+IMAGENETTE = "imagenette"
+GTSRB = "gtsrb"
 
 if not os.environ.get("SCRIPT_ALREADY_RAN"):
     print("setting seeds")
@@ -131,14 +133,63 @@ IMAGENETTE_CLASSES = {
     491: 'Chain Saw', 497: 'Church', 566: 'French Horn', 
     569: 'Garbage Truck', 571: 'Gas Pump', 574: 'Golf Ball', 701: 'Parachute'
 }
-
+GTSRB_CLASSES = {
+    0: 'Speed limit (20kmh)', 
+    1: 'Speed limit (30kmh)', 
+    2: 'Speed limit (50kmh)', 
+    3: 'Speed limit (60kmh)', 
+    4: 'Speed limit (70kmh)', 
+    5: 'Speed limit (80kmh)', 
+    6: 'End of speed limit (80kmh)', 
+    7: 'Speed limit (100kmh)', 
+    8: 'Speed limit (120kmh)', 
+    9: 'No passing', 
+    10: 'No passing veh over 3.5 tons', 
+    11: 'Right-of-way at intersection', 
+    12: 'Priority road', 
+    13: 'Yield', 
+    14: 'Stop', 
+    15: 'No vehicles', 
+    16: 'Veh over 3.5 tons prohibited', 
+    17: 'No entry', 
+    18: 'General caution', 
+    19: 'Dangerous curve left', 
+    20: 'Dangerous curve right', 
+    21: 'Double curve', 
+    22: 'Bumpy road', 
+    23: 'Slippery road', 
+    24: 'Road narrows on the right', 
+    25: 'Road work', 
+    26: 'Traffic signals', 
+    27: 'Pedestrians', 
+    28: 'Children crossing', 
+    29: 'Bicycles crossing', 
+    30: 'Beware of ice_snow', 
+    31: 'Wild animals crossing', 
+    32: 'End speed + passing limits', 
+    33: 'Turn right ahead', 
+    34: 'Turn left ahead', 
+    35: 'Ahead only', 
+    36: 'Go straight or right', 
+    37: 'Go straight or left', 
+    38: 'Keep right', 
+    39: 'Keep left', 
+    40: 'Roundabout mandatory', 
+    41: 'End of no passing', 
+    42: 'End no passing veh over 3.5 tons'
+}
 IMAGENETTE_TO_IMAGENET = {0:0, 1:217, 2:482, 3:491, 4:497, 5:566, 6:569, 7:571, 8:574, 9:701}
 
 def map_class_to_imagenet(y):
     return IMAGENETTE_TO_IMAGENET[y]
 
-def get_class_name(class_idx):
-    return IMAGENETTE_CLASSES.get(class_idx, f"Class {class_idx}")
+def get_class_name(data_name, class_idx):
+    if data_name == IMAGENETTE:
+        return IMAGENETTE_CLASSES.get(class_idx, f"Class {class_idx}")
+    elif data_name == GTSRB:
+        return GTSRB_CLASSES.get(class_idx, f"Class {class_idx}")
+    else:
+        return f"Class {class_idx}"
 
 # --- Custom Noise Transform ---
 class AddMotionBlur(object):
@@ -247,11 +298,11 @@ def denormalize(tensor):
     return torch.clamp(tensor, 0, 1)
 
 
-def get_test_loaders_for_gaussian(batch_size=32,std1=0.5,std2=1,data_name = "imagenette"):
+def get_test_loaders_for_gaussian(batch_size=32,std1=0.5,std2=1,data_name = IMAGENETTE):
 
-    if data_name == "imagenette":
+    if data_name == IMAGENETTE:
         _, val_dir = download_and_extract_imagenette()
-    elif data_name == "gtsrb":
+    elif data_name == GTSRB:
         _, val_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
@@ -284,25 +335,34 @@ def get_test_loaders_for_gaussian(batch_size=32,std1=0.5,std2=1,data_name = "ima
 
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
-    
-    dataset_clean = ImageFolder(root=val_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
-    loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
+    if data_name == IMAGENETTE:
+        dataset_clean = ImageFolder(root=val_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
+        loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
+        dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    dataset_noise2 = ImageFolder(root=val_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
+        dataset_noise2 = ImageFolder(root=val_dir, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
+    elif data_name == GTSRB:
+        dataset_clean = ImageFolder(root=val_dir, transform=transform_clean)
+        loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
+
+        dataset_noise1 = ImageFolder(root=val_dir, transform=transform_noise_std1)
+        loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
+
+        dataset_noise2 = ImageFolder(root=val_dir, transform=transform_noise_std2)
+        loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return loader_clean, loader_noise1, loader_noise2
 
 
 
-def get_test_loaders_for_motion_blur(batch_size=32,kernel_size1=15,kernel_size2=25,data_name = "imagenette"):
+def get_test_loaders_for_motion_blur(batch_size=32,kernel_size1=15,kernel_size2=25,data_name = IMAGENETTE):
 
-    if data_name == "imagenette":
+    if data_name == IMAGENETTE:
         _, val_dir = download_and_extract_imagenette()
-    elif data_name == "gtsrb":
+    elif data_name == GTSRB:
         _, val_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
@@ -335,7 +395,7 @@ def get_test_loaders_for_motion_blur(batch_size=32,kernel_size1=15,kernel_size2=
 
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
-    if data_name == "imagenette":
+    if data_name == IMAGENETTE:
             
         dataset_clean = ImageFolder(root=val_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
         loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
@@ -370,9 +430,9 @@ def train_val_split(dataset, train_indices, val_indices):
 
 
 def get_traing_val_test_loaders_for_gaussian(config):
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
         train_dir, test_dir = download_and_extract_imagenette()
-    elif config.data_name == "gtsrb":
+    elif config.data_name == GTSRB:
         train_dir, test_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
@@ -400,7 +460,7 @@ def get_traing_val_test_loaders_for_gaussian(config):
         AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), 
         normalization
     ])
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
         train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
     else:
         train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1)
@@ -420,7 +480,7 @@ def get_traing_val_test_loaders_for_gaussian(config):
         normalization
     ])
 
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
         train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
         _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
         _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
@@ -470,7 +530,7 @@ def get_traing_val_test_loaders_for_gaussian(config):
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
 
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
 
         dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
 
@@ -494,9 +554,9 @@ def get_traing_val_test_loaders_for_gaussian(config):
 
 
 def get_traing_val_test_loaders_for_motion_blure(config):
-    if config.data_name == "imagenette": 
+    if config.data_name == IMAGENETTE: 
         train_dir, test_dir = download_and_extract_imagenette()
-    elif config.data_name == "gtsrb":
+    elif config.data_name == GTSRB:
         train_dir, test_dir = prepare_gtsrb_for_imagefolder()
 
     # 3. Define Image Transforms (Baseline + Noise Variations)
@@ -524,7 +584,7 @@ def get_traing_val_test_loaders_for_motion_blure(config):
         AddMotionBlur(kernel_size=config.kernel_size2), 
         normalization
     ])
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
         train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
     else:
         train_dataset1 = ImageFolder(root=train_dir, transform=transform_noise_std1)
@@ -543,7 +603,7 @@ def get_traing_val_test_loaders_for_motion_blure(config):
         normalization
     ])
 
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
         train_dataset2 = ImageFolder(root=train_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
         _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)#clean validation set
         _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)#noisey validation
@@ -594,7 +654,7 @@ def get_traing_val_test_loaders_for_motion_blure(config):
     # 4. Load the Datasets & Loaders
     print("Loading validation datasets with different noise profiles...")
 
-    if config.data_name == "imagenette":
+    if config.data_name == IMAGENETTE:
         dataset_clean = ImageFolder(root=test_dir, transform=transform_clean, target_transform=map_class_to_imagenet)
 
         loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
@@ -676,14 +736,14 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
             img_higher_order = img3.squeeze(0).to(device)
             
             # Generate the plot
-            fig = prog_vis.extract_and_return_figure(torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
+            fig = prog_vis.extract_and_return_figure(config.data_name,torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
             
             # Log to WandB and close the figure to avoid memory leaks
             wandb.log({f"Network Progression ": wandb.Image(fig)})
             plt.close(fig)
 
-        if best_accuracy <= noisy_acc:
-            best_accuracy = noisy_acc
+        if best_accuracy <= clean_acc:
+            best_accuracy = clean_acc
             # Save using the specific filename set in wandb config
             torch.save(model.state_dict(), wandb.config.best_model_filename)
             print(f"New best model saved as '{wandb.config.best_model_filename}' with accuracy: {best_accuracy:.2f}%")

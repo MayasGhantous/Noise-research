@@ -12,7 +12,10 @@ from resnet_18.visualizer import *
 def main(prob, group_norm,Unet,data_name,noise_type):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
-    target_run_name = "{}_{}_Modifiedresnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, Unet)
+    if prob == 0.5:
+        target_run_name = "{}_{}_Modifiedresnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, Unet)
+    else:
+        target_run_name = "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}".format(data_name, noise_type, prob, group_norm, Unet)
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
     found_run = False

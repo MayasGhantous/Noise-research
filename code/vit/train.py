@@ -15,9 +15,12 @@ def main(prob, group_norm, unet, data_name, noise_type):
 
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
-    target_run_name = "{}_{}_VIT_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet)
+    if prob == 0.5:
+        target_run_name = "{}_{}_VIT_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet)
+    else: 
+        target_run_name = "{}_{}_VIT_prob{}_group_norm{}_Unet_{}".format(data_name, noise_type, prob, group_norm, unet)
     api = wandb.Api()
-    runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
+    runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name},)
     found_run = False
     if len(runs) > 0:
         # An existing run was found! Grab its internal ID

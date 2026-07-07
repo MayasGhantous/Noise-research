@@ -28,7 +28,7 @@ class ViTBatchAttentionVisualizer:
             self.qkv_output = output.detach().cpu()
         return hook
 
-    def extract_and_return_figure(self, input_batch, true_labels, class_names=None):
+    def extract_and_return_figure(self, data_name, input_batch, true_labels):
         batch_size = input_batch.shape[0]
         device = next(self.model.parameters()).device
         input_batch = input_batch.to(device)
@@ -91,15 +91,15 @@ class ViTBatchAttentionVisualizer:
         predictions = predictions.tolist()
 
         return self._create_batch_figure(
+            data_name,
             input_batch.cpu(), 
             unet_batch.detach().cpu(), 
             heatmaps, 
             true_labels, 
-            predictions, 
-            class_names
+            predictions
+            
         )
-
-    def _create_batch_figure(self, input_batch, unet_batch, heatmaps, true_labels, predictions, class_names):
+    def _create_batch_figure(self,data_name, input_batch, unet_batch, heatmaps, true_labels, predictions):
         batch_size = input_batch.shape[0]
         has_unet = self.unet is not None
         num_cols = 4 if has_unet else 3
@@ -118,8 +118,8 @@ class ViTBatchAttentionVisualizer:
             t_label = true_labels[i]
             p_label = predictions[i]
             
-            t_text = get_class_name(t_label) if 'get_class_name' in globals() else str(t_label)
-            p_text = get_class_name(p_label) if 'get_class_name' in globals() else str(p_label)
+            t_text = get_class_name(data_name=data_name, class_idx=t_label)
+            p_text = get_class_name(data_name=data_name, class_idx=p_label)
             
             title_color = "green" if t_label == p_label else "red"
             
