@@ -33,7 +33,7 @@ def main(prob, group_norm, unet, data_name, noise_type):
         run_id = wandb.util.generate_id()
         print("No existing run found. Starting a new one.")
     if data_name == "imagenette":
-        num_epochs = 20
+        num_epochs = 5
     else:
         num_epochs = 5
     
