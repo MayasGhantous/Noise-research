@@ -41,6 +41,7 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.init(
     project="Noise-Research",
     name=target_run_name,
+    group="CNN",
     id=run_id,
     resume="allow",
     config={
@@ -77,14 +78,15 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     #weights = models.VGG16_BN_Weights.DEFAULT
     #model = models.vgg16_bn(weights=weights)
     model = network.CNN( num_classes=1000)
-    if found_run:
-        model.load_state_dict(torch.load(config.best_model_filename))
+    
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
     if config.UNet:
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
+    if found_run:
+        model.load_state_dict(torch.load(config.best_model_filename))
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-2)
     criterion = nn.CrossEntropyLoss()
