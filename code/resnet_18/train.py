@@ -1,12 +1,7 @@
 from visualizer import *
-import sys
-from pathlib import Path
-parent_dir = str(Path(__file__).parent.parent)
-
-# 2. Add the parent directory to Python's search path
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
 from Unet import  UNetWrapper
+from torchvision import models
+
 
 def main(prob,group_norm,unet,data_name,noise_type):
     if data_name == "imagenette":
@@ -84,8 +79,8 @@ def main(prob,group_norm,unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_names = ["gtsrb", "imagenette"]
-    noise_type = ["gaussian", "motion_blur"]
+    data_names = [ "imagenette"]
+    noise_type = ["gaussian"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
@@ -94,6 +89,5 @@ if __name__ == "__main__":
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                    
                         main(prob, group_norm, unet, data_name, noise)
                         

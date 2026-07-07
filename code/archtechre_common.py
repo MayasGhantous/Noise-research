@@ -15,8 +15,6 @@ import wandb
 import matplotlib.pyplot as plt
 import numpy as np
 import tqdm 
-import torch.nn.functional as F
-import torch.nn as nn
 
 if not os.environ.get("SCRIPT_ALREADY_RAN"):
     print("setting seeds")

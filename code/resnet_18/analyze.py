@@ -4,7 +4,8 @@ from visualizer import *
 parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from archtechre_common import *
+from torchvision import models
+from visualizer_common import *
 from Unet import UNetWrapper
 
 def main(model_name,group_norm,unet,gaussian,models_location = str(Path(__file__).parent)+"/models"): 

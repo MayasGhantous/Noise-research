@@ -1,24 +1,11 @@
-import torch
-import torch.nn.functional as F
-import torchvision.models as models
-import torchvision.transforms as transforms
-from torchvision.models import ResNet18_Weights
-import matplotlib.pyplot as plt
-import numpy as np
-import urllib.request
-from PIL import Image
-import torch.nn as nn
-from torchvision.utils import make_grid
 import sys
 from pathlib import Path
 parent_dir = str(Path(__file__).parent.parent)
-
-
 # 2. Add the parent directory to Python's search path
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
-
+import torch.nn as nn
 class ResNet18FeatureVisualizer:
     def __init__(self, model, unet=None):
         self.model = model

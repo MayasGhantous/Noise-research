@@ -7,12 +7,15 @@ parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from Unet import  UNetWrapper
+from archtechre_common import *
+import timm
 
 
 def main(prob, group_norm, unet, data_name, noise_type):
     wandb.init(
     project="Noise-Research",
     name="{}_VIT_group_norm{}_Unet_{}".format(noise_type, group_norm, unet),
+    group="VIT",
     config={
         "learning_rate": 1e-4,
         "num_epochs": 20,

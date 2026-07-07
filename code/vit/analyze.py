@@ -5,7 +5,7 @@ from visualizer import *
 parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from archtechre_common import *
+from visualizer_common import *
 from Unet import UNetWrapper
 
 

@@ -1,12 +1,12 @@
 from pathlib import Path
 import sys
 from network import create_resnet18_without_skip
-from visualizer import *
 parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
-from archtechre_common import *
 from Unet import UNetWrapper
+from resnet_18.visualizer import *
+from visualizer_common import *
 
 def load_model(model_name,group_norm,unet,models_location):
     model = create_resnet18_without_skip()
