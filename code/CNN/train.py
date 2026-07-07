@@ -19,12 +19,34 @@ from Unet import UNetWrapper
 from resnet_18.visualizer import replace_bn_with_gn
 
 def main(prob, group_norm,Unet,data_name,noise_type):
+    entity_name = "wandb-mias-"  # Replace with your WandB entity name
+    project_name = "Noise_Research"  # Replace with your WandB project name
+    target_run_name = "{}_{}_CNN_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, Unet)
+    api = wandb.Api()
+    runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
+    found_run = False
+    if len(runs) > 0:
+        # An existing run was found! Grab its internal ID
+        run_id = runs[0].id
+        print(f"Found existing run! Resuming ID: {run_id}")
+        found_run = True
+    else:
+        # No run found. Generate a fresh ID
+        run_id = wandb.util.generate_id()
+        print("No existing run found. Starting a new one.")
+    if data_name == "imagenette":
+        num_epochs = 20
+    else:
+        num_epochs = 5
     wandb.init(
     project="Noise-Research",
-    name="{}_CNN_group_norm{}_Unet_{}".format(noise_type, group_norm, Unet),
+    name=target_run_name,
+    group="CNN",
+    id=run_id,
+    resume="allow",
     config={
         "learning_rate": 1e-3,
-        "num_epochs": 20,
+        "num_epochs": num_epochs,
         "batch_size": 32,
         "num_workers": 2,
         "seed": 42,
@@ -35,8 +57,8 @@ def main(prob, group_norm,Unet,data_name,noise_type):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "kernel_size1": 20,
-        "kernel_size2": 30,
+        "kernel_size1": 101,
+        "kernel_size2": 151,
         "best_model_filename": "{}_{}_CNN_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
@@ -63,6 +85,8 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     if config.UNet:
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
+    if found_run:
+        model.load_state_dict(torch.load(config.best_model_filename))
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-2)
     criterion = nn.CrossEntropyLoss()

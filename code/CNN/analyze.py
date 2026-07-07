@@ -1,6 +1,5 @@
 from pathlib import Path
 import sys
-import timm
 from visualizer import *
 parent_dir = str(Path(__file__).parent.parent)
 if parent_dir not in sys.path:
