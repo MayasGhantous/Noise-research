@@ -16,6 +16,7 @@ def main(prob, group_norm,Unet,data_name,noise_type):
         target_run_name = "{}_{}_Modifiedresnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, Unet)
     else:
         target_run_name = "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}".format(data_name, noise_type, prob, group_norm, Unet)
+    target_run_name = "{}_{}_Modifiedresnet18_base_line".format(data_name, noise_type)
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
     found_run = False
@@ -29,13 +30,10 @@ def main(prob, group_norm,Unet,data_name,noise_type):
         run_id = wandb.util.generate_id()
         print("No existing run found. Starting a new one.")
     if data_name == "imagenette":
-        num_epochs = 20
+        num_epochs = 5
     else:
         num_epochs = 5
-    if data_name == "imagenette":
-        num_epochs = 20
-    else:
-        num_epochs = 5
+   
     wandb.init(
         project=project_name,
         name=target_run_name,
@@ -57,7 +55,8 @@ def main(prob, group_norm,Unet,data_name,noise_type):
             "eval_noise_std2": 1.0,
             "kernel_size1": 101,
             "kernel_size2": 151,
-            "best_model_filename": "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
+            #"best_model_filename": "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
+            "best_model_filename": "{}_{}_Modifiedresnet18_base_line.pth".format(data_name, noise_type),
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": Unet,
@@ -110,7 +109,7 @@ if __name__ == "__main__":
     noise_types = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise_type in noise_types:
-            main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
+            main(prob=0., group_norm=0, Unet=False, data_name=data_name, noise_type=noise_type)
     
     '''data_names = ["imagenette"]
     noise_type = ["gaussian"]
