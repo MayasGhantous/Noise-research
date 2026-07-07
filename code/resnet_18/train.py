@@ -69,9 +69,9 @@ def main(prob,group_norm,unet,data_name,noise_type):
     
     if config.data_name == "imagenette":
         print("Downloading/Loading pretrained ResNet18...")
-        model = models.resnet18(weights=None)
+        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
     else:
-        model = models.resnet18(weights=None)
+        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
     
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
