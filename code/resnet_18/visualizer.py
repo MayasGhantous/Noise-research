@@ -6,6 +6,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 from archtechre_common import *
 import torch.nn as nn
+
 class ResNet18FeatureVisualizer:
     def __init__(self, model, unet=None):
         self.model = model
