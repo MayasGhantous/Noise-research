@@ -106,7 +106,13 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_names = ["imagenette"]
+    data_names = ["gtsrb", "imagenette"]
+    noise_types = ["gaussian", "motion_blur"]
+    for data_name in data_names:
+        for noise_type in noise_types:
+            main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
+    
+    '''data_names = ["imagenette"]
     noise_type = ["gaussian"]
     for data_name in data_names:
         for noise in noise_type:
@@ -117,3 +123,4 @@ if __name__ == "__main__":
                 for group_norm in group_norms:
                     for unet in unet_options:
                         main(prob, group_norm, unet, data_name, noise)
+    '''
