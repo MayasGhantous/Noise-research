@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
-
+import torch.nn as nn
 from archtechre_common import *
 
 def analyze_batches(model, 
@@ -437,12 +437,12 @@ def display_multiple_images_fft_progress(model, input_tensors, original_images, 
 
 
 
-def save_fft_map_for_an_index(model_name,group_norm,unet, index,gaussian, saving_location,load_model,models_location):
+def save_fft_map_for_an_index(dataset_name, model_name, group_norm, unet, index, gaussian, saving_location, load_model, models_location):
     if gaussian:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0)
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, dataset_name=dataset_name)
     else:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=20, kernel_size2=30)
-    model = load_model(model_name,group_norm,unet,models_location)
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=20, kernel_size2=30, dataset_name=dataset_name)
+    model = load_model(model_name, group_norm, unet, models_location)
     model.eval()
 
     sample_images = []
