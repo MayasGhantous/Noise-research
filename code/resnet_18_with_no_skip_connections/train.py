@@ -57,7 +57,7 @@ def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
             "eval_noise_std2": 1.0,
             "kernel_size1": 31,
             "kernel_size2": 101,
-            "best_model_filename": "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
+            "best_model_filename": f"{target_run_name}.pth",
             #"best_model_filename": "{}_{}_Modifiedresnet18_base_line.pth".format(data_name, noise_type),
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
@@ -78,9 +78,13 @@ def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
     print("Downloading/Loading pretrained ResNet18...")
     model = create_resnet18_without_skip()
     if config.pretrained:
-        print("Loading pretrained weights...")
-        name = f"{config.data_name}_{config.noise_type}_Modifiedresnet18.pth"
-        model.load_state_dict(torch.load(name))
+        try:
+            print("Loading pretrained weights...")
+            name = f"{config.data_name}_{config.noise_type}_Modifiedresnet18.pth"
+            model.load_state_dict(torch.load(name))
+        except FileNotFoundError:
+            print("Pretrained weights not found.")   
+            raise FileNotFoundError(f"Pretrained weights not found at {name}. Please ensure the file exists.")   
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
@@ -88,7 +92,11 @@ def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
     if found_run:
-        model.load_state_dict(torch.load(config.best_model_filename))
+        try:
+            model.load_state_dict(torch.load(config.best_model_filename))
+            print("Loaded model weights from previous run.")
+        except FileNotFoundError:
+            print("Model weights from previous run not found. Starting fresh.")
     model = model.to(device)
     
     if config.UNet:
@@ -117,13 +125,13 @@ if __name__ == "__main__":
         for noise_type in noise_types:
             main(prob=0., group_norm=0, Unet=False, data_name=data_name, noise_type=noise_type)
     '''
-    data_names = ["imagenette"]
-    noise_type = ["gaussian"]
+    data_names = ["imagenette", "gtsrb"]
+    noise_type = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [True]
+            unet_options = [False,True]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
