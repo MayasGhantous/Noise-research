@@ -3,10 +3,16 @@ from Unet import  UNetWrapper
 from torchvision import models
 
 
-def main(prob,group_norm,unet,data_name,noise_type):
+def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
-    target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+    if prob == 0.5:
+        target_run_name = f"{data_name}_{noise_type}_resnet18_group_norm{group_norm}_Unet_{unet}"
+    else:
+        target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+    #target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
+    if pretrained:
+        target_run_name = f"{target_run_name}_pretrained"
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
     found_run = False
@@ -20,9 +26,10 @@ def main(prob,group_norm,unet,data_name,noise_type):
         run_id = wandb.util.generate_id()
         print("No existing run found. Starting a new one.")
     if data_name == "imagenette":
-        num_epochs = 20
+        num_epochs = 5
     else:
         num_epochs = 5
+    
     wandb.init(
         project=project_name,
         group="Resnet_18",
@@ -42,14 +49,16 @@ def main(prob,group_norm,unet,data_name,noise_type):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "kernel_size1": 101,
+            "kernel_size1": 31,
             "kernel_size2": 151,
-            "best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
+            "best_model_filename": f"{target_run_name}.pth",
+            #"best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": unet,
             "data_name": data_name,
-            "noise_type": noise_type 
+            "noise_type": noise_type,
+            "pretrained": pretrained
         }
     )
     
@@ -63,9 +72,18 @@ def main(prob,group_norm,unet,data_name,noise_type):
     
     if config.data_name == "imagenette":
         print("Downloading/Loading pretrained ResNet18...")
-        model = models.resnet18(weights=None)
+        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
     else:
-        model = models.resnet18(weights=None)
+        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+    
+    if config.pretrained:
+        print("Loading pretrained weights...")
+        try:
+            name = f"{config.data_name}_{config.noise_type}_resnet18_base_line.pth"
+            model.load_state_dict(torch.load(name))
+        except FileNotFoundError:
+            print("Pretrained weights not found.")
+            raise FileNotFoundError(f"Pretrained weights not found at {name}. Please ensure the file exists.")
     
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
@@ -74,7 +92,11 @@ def main(prob,group_norm,unet,data_name,noise_type):
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
     if found_run:
-        model.load_state_dict(torch.load(config.best_model_filename))
+        try:
+            model.load_state_dict(torch.load(config.best_model_filename))
+            print("Loaded model weights from previous run.")
+        except FileNotFoundError:
+            print("Model weights from previous run not found. Starting fresh.")
     model = model.to(device)
     
     if config.UNet:
@@ -98,14 +120,14 @@ def main(prob,group_norm,unet,data_name,noise_type):
     
 if __name__ == "__main__":
     data_names = ["gtsrb", "imagenette"]
-    noise_type = ["motion_blur"]
+    noise_types = ["gaussian"]
     for data_name in data_names:
-        for noise in noise_type:
+        for noise in noise_types:
             probs = [0.5]
             group_norms = [0,8]
             unet_options = [False,True]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise)
-                        
+                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+    

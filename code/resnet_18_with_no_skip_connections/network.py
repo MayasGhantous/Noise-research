@@ -13,20 +13,12 @@ def forward_without_skip(self, x):
     out = self.conv2(out)
     out = self.bn2(out)
 
-    # ---------------------------------------------------------
-    # SKIP CONNECTION REMOVED HERE
-    # Original code had: 
-    # identity = x 
-    # ... (downsample logic) ...
-    # out += identity
-    # ---------------------------------------------------------
-
     out = self.relu(out)
     return out
 
 def create_resnet18_without_skip():
     # 2. Load standard ResNet-18
-    model = models.resnet18(weights=None)  # Use weights=None for training from scratch
+    model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)  # Use weights=None for training from scratch
 
     # 3. Overwrite the forward method for all BasicBlocks
     for module in model.modules():

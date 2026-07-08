@@ -11,13 +11,19 @@ from archtechre_common import *
 import timm
 
 
-def main(prob, group_norm, unet, data_name, noise_type):
+def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
 
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
-    target_run_name = "{}_{}_VIT_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet)
+    if prob == 0.5:
+        target_run_name = "{}_{}_VIT_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet)
+    else: 
+        target_run_name = "{}_{}_VIT_prob{}_group_norm{}_Unet_{}".format(data_name, noise_type, prob, group_norm, unet)
+    #target_run_name = "{}_{}_VIT_base_line".format(data_name, noise_type)
+    if pretrained:
+       target_run_name = f"{target_run_name}_pretrained"
     api = wandb.Api()
-    runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
+    runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name},)
     found_run = False
     if len(runs) > 0:
         # An existing run was found! Grab its internal ID
@@ -29,7 +35,7 @@ def main(prob, group_norm, unet, data_name, noise_type):
         run_id = wandb.util.generate_id()
         print("No existing run found. Starting a new one.")
     if data_name == "imagenette":
-        num_epochs = 20
+        num_epochs = 5
     else:
         num_epochs = 5
     
@@ -52,14 +58,16 @@ def main(prob, group_norm, unet, data_name, noise_type):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "kernel_size1": 101,
+        "kernel_size1": 31,
         "kernel_size2": 151,
-        "best_model_filename": "{}_{}_VIT_prob{}_group_norm{}.pth".format(data_name, noise_type, prob, group_norm),
+        "best_model_filename": f"{target_run_name}.pth",
+        #"best_model_filename": "{}_{}_VIT_base_line.pth".format(data_name, noise_type),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
         "UNet": unet,
         "data_name": data_name,
-        "noise_type": noise_type
+        "noise_type": noise_type,
+        "pretrained": pretrained
     }
     )
     config = wandb.config
@@ -72,9 +80,14 @@ def main(prob, group_norm, unet, data_name, noise_type):
         train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_motion_blure(config=config)
     print("Downloading/Loading pretrained VIT...")
     if config.data_name == "gtsrb":
-        model = timm.create_model('vit_tiny_patch16_224', pretrained=False).to(device)
+        model = timm.create_model('vit_tiny_patch16_224',pretrained=True).to(device)
     else:
         model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
+    if config.pretrained:
+
+        print("Loading pretrained weights...")
+        name = f"{config.data_name}_{config.noise_type}_VIT_base_line.pth"
+        model.load_state_dict(torch.load(name))
     if config.group_norm_groups > 0:
         print(f"Replacing LayerNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
@@ -82,7 +95,11 @@ def main(prob, group_norm, unet, data_name, noise_type):
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model, in_channels=3, out_channels=3, base_features=16)
     if found_run:
-        model.load_state_dict(torch.load(config.best_model_filename))
+        try:
+            model.load_state_dict(torch.load(config.best_model_filename))
+            print("Loaded model weights from previous run.")
+        except FileNotFoundError:
+            print("Model weights from previous run not found. Starting fresh.")
     model = model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-2)
@@ -106,14 +123,21 @@ def main(prob, group_norm, unet, data_name, noise_type):
     wandb.finish()
 
 if __name__ == "__main__":
-    data_names = ["gtsrb","imagenette"]
-    noise_type = ["gaussian","motion_blur"]
+    '''data_names = ["gtsrb", "imagenette"]
+    noise_types = ["gaussian", "motion_blur"]
+    for data_name in data_names:
+        for noise_type in noise_types:
+            main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
+    '''
+    data_names = ["gtsrb", "imagenette"]
+    noise_type = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [False,True]
+            unet_options = [True,False]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise)
+                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+        
