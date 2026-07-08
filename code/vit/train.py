@@ -58,7 +58,7 @@ def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "kernel_size1": 101,
+        "kernel_size1": 31,
         "kernel_size2": 151,
         "best_model_filename": "{}_{}_VIT_prob{}_group_norm{}.pth".format(data_name, noise_type, prob, group_norm),
         #"best_model_filename": "{}_{}_VIT_base_line.pth".format(data_name, noise_type),

@@ -755,7 +755,7 @@ def test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std
     clean_accuracy = evaluate_model(model, loader_clean, device, "Baseline (Clean Images)")
     noise1_accuracy = 0
     noise2_accuracy = 0
-    for _ in range(5):  # Run multiple evaluations to average out randomness
+    for _ in range(2):  # Run multiple evaluations to average out randomness
         noise1_accuracy += evaluate_model(model, loader_noise1, device, f"Gaussian Noise (std={std1})")
         noise2_accuracy += evaluate_model(model, loader_noise2, device, f"Gaussian Noise (std={std2})")
     print(f"Average Accuracy for Clean Images: {clean_accuracy:.2f}%")

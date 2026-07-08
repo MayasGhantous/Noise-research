@@ -7,7 +7,7 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
     if prob == 0.5:
-        target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+        target_run_name = f"{data_name}_{noise_type}_resnet18_group_norm{group_norm}_Unet_{unet}"
     else:
         target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
     #target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
@@ -49,9 +49,9 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "kernel_size1": 101,
+            "kernel_size1": 31,
             "kernel_size2": 151,
-            "best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
+            "best_model_filename": f"{target_run_name}.pth",
             #"best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
@@ -78,8 +78,12 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     
     if config.pretrained:
         print("Loading pretrained weights...")
-        name = f"{config.data_name}_{config.noise_type}_resnet18_base_line.pth"
-        model.load_state_dict(torch.load(name))
+        try:
+            name = f"{config.data_name}_{config.noise_type}_resnet18_base_line.pth"
+            model.load_state_dict(torch.load(name))
+        except FileNotFoundError:
+            print("Pretrained weights not found.")
+            raise FileNotFoundError(f"Pretrained weights not found at {name}. Please ensure the file exists.")
     
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
@@ -88,7 +92,11 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
     if found_run:
-        model.load_state_dict(torch.load(config.best_model_filename))
+        try:
+            model.load_state_dict(torch.load(config.best_model_filename))
+            print("Loaded model weights from previous run.")
+        except FileNotFoundError:
+            print("Model weights from previous run not found. Starting fresh.")
     model = model.to(device)
     
     if config.UNet:
@@ -113,10 +121,6 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
 if __name__ == "__main__":
     data_names = ["gtsrb", "imagenette"]
     noise_types = ["gaussian", "motion_blur"]
-    '''for data_name in data_names:
-        for noise_type in noise_types:
-            main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
-    '''
     noise_type = ["motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
@@ -126,5 +130,5 @@ if __name__ == "__main__":
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise)
+                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
     

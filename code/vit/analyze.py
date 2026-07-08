@@ -42,5 +42,51 @@ def main(data_name, model_name, group_norm, unet, gaussian, models_location = st
     save_figures(model, model_visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location, max_samples=5)
     # save_features(model,model_visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location)
 if __name__ == "__main__":
-    main("imagenette","motion_vit_prob0_group_norm0_Unet_True.pth",group_norm = 0, unet=True,gaussian = False)
-    save_fft_map_for_an_index("imagenette", "motion_vit_prob0_group_norm0_Unet_True.pth",group_norm = 0, unet=True, index=50,gaussian = False, load_model=load_model, saving_location = str(Path(__file__).parent)+"/analysis_results",models_location = str(Path(__file__).parent)+"/models")
+    model = load_model("gtsrb_gaussian_VIT_prob0.5_group_norm8.pth", group_norm=8, unet=True, models_location = str(Path(__file__).parent)+"/models")
+    loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.05, std2=0.1, data_name="gtsrb")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.05, std2=0.1)
+    #main("imagenette","motion_vit_prob0_group_norm0_Unet_True.pth",group_norm = 0, unet=True,gaussian = False)
+    #save_fft_map_for_an_index("imagenette", "motion_vit_prob0_group_norm0_Unet_True.pth",group_norm = 0, unet=True, index=50,gaussian = False, load_model=load_model, saving_location = str(Path(__file__).parent)+"/analysis_results",models_location = str(Path(__file__).parent)+"/models")
