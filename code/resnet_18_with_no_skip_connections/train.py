@@ -55,8 +55,8 @@ def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "kernel_size1": 31,
-            "kernel_size2": 101,
+            "kernel_size1": 51,
+            "kernel_size2": 91,
             "best_model_filename": f"{target_run_name}.pth",
             #"best_model_filename": "{}_{}_Modifiedresnet18_base_line.pth".format(data_name, noise_type),
             "plot_every_n_epochs": 1,
@@ -129,6 +129,8 @@ if __name__ == "__main__":
     noise_type = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
+            if data_name == "gtsrb" and noise == "gaussian":
+                continue
             probs = [0.5]
             group_norms = [0,8]
             unet_options = [False,True]
