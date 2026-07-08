@@ -125,9 +125,9 @@ if __name__ == "__main__":
         for noise in noise_types:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [True]
+            unet_options = [False,True]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+                        main(prob, group_norm, unet, data_name, noise, pretrained=False)
     
