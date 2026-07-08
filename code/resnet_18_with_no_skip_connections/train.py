@@ -80,7 +80,7 @@ def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
     if config.pretrained:
         try:
             print("Loading pretrained weights...")
-            name = f"{config.data_name}_{config.noise_type}_Modifiedresnet18.pth"
+            name = f"{config.data_name}_{config.noise_type}_Modifiedresnet18_base_line.pth"
             model.load_state_dict(torch.load(name))
         except FileNotFoundError:
             print("Pretrained weights not found.")   

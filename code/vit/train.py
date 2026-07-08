@@ -60,7 +60,7 @@ def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
         "eval_noise_std2": 1.0,
         "kernel_size1": 31,
         "kernel_size2": 151,
-        "best_model_filename": "{}_{}_VIT_prob{}_group_norm{}.pth".format(data_name, noise_type, prob, group_norm),
+        "best_model_filename": f"{target_run_name}.pth",
         #"best_model_filename": "{}_{}_VIT_base_line.pth".format(data_name, noise_type),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
@@ -84,6 +84,7 @@ def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
     else:
         model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
     if config.pretrained:
+
         print("Loading pretrained weights...")
         name = f"{config.data_name}_{config.noise_type}_VIT_base_line.pth"
         model.load_state_dict(torch.load(name))
@@ -94,7 +95,11 @@ def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model, in_channels=3, out_channels=3, base_features=16)
     if found_run:
-        model.load_state_dict(torch.load(config.best_model_filename))
+        try:
+            model.load_state_dict(torch.load(config.best_model_filename))
+            print("Loaded model weights from previous run.")
+        except FileNotFoundError:
+            print("Model weights from previous run not found. Starting fresh.")
     model = model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-2)
@@ -124,13 +129,13 @@ if __name__ == "__main__":
         for noise_type in noise_types:
             main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
     '''
-    data_names = ["gtsrb"]
-    noise_type = ["gaussian"]
+    data_names = ["gtsrb", "imagenette"]
+    noise_type = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [True]
+            unet_options = [True,False]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:

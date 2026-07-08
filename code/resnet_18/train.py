@@ -120,10 +120,9 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     
 if __name__ == "__main__":
     data_names = ["gtsrb", "imagenette"]
-    noise_types = ["gaussian", "motion_blur"]
-    noise_type = ["motion_blur"]
+    noise_types = ["gaussian"]
     for data_name in data_names:
-        for noise in noise_type:
+        for noise in noise_types:
             probs = [0.5]
             group_norms = [0,8]
             unet_options = [False,True]
