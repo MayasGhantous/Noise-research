@@ -3,14 +3,16 @@ from Unet import  UNetWrapper
 from torchvision import models
 
 
-def main(prob,group_norm,unet,data_name,noise_type):
+def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
     if prob == 0.5:
         target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
     else:
         target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
-    target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
+    #target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
+    if pretrained:
+        target_run_name = f"{target_run_name}_pretrained"
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
     found_run = False
@@ -49,13 +51,14 @@ def main(prob,group_norm,unet,data_name,noise_type):
             "eval_noise_std2": 1.0,
             "kernel_size1": 101,
             "kernel_size2": 151,
-            #"best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
-            "best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
+            "best_model_filename": f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}.pth",
+            #"best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": unet,
             "data_name": data_name,
-            "noise_type": noise_type 
+            "noise_type": noise_type,
+            "pretrained": pretrained
         }
     )
     
@@ -72,6 +75,11 @@ def main(prob,group_norm,unet,data_name,noise_type):
         model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
     else:
         model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+    
+    if config.pretrained:
+        print("Loading pretrained weights...")
+        name = f"{config.data_name}_{config.noise_type}_resnet18_base_line.pth"
+        model.load_state_dict(torch.load(name))
     
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
@@ -105,10 +113,11 @@ def main(prob,group_norm,unet,data_name,noise_type):
 if __name__ == "__main__":
     data_names = ["gtsrb", "imagenette"]
     noise_types = ["gaussian", "motion_blur"]
-    for data_name in data_names:
+    '''for data_name in data_names:
         for noise_type in noise_types:
             main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
-    '''noise_type = ["motion_blur"]
+    '''
+    noise_type = ["motion_blur"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
@@ -118,5 +127,4 @@ if __name__ == "__main__":
                 for group_norm in group_norms:
                     for unet in unet_options:
                         main(prob, group_norm, unet, data_name, noise)
-    '''
-                        
+    

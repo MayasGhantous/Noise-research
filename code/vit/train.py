@@ -11,7 +11,7 @@ from archtechre_common import *
 import timm
 
 
-def main(prob, group_norm, unet, data_name, noise_type):
+def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
 
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
@@ -19,7 +19,9 @@ def main(prob, group_norm, unet, data_name, noise_type):
         target_run_name = "{}_{}_VIT_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, unet)
     else: 
         target_run_name = "{}_{}_VIT_prob{}_group_norm{}_Unet_{}".format(data_name, noise_type, prob, group_norm, unet)
-    target_run_name = "{}_{}_VIT_base_line".format(data_name, noise_type)
+    #target_run_name = "{}_{}_VIT_base_line".format(data_name, noise_type)
+    if pretrained:
+       target_run_name = f"{target_run_name}_pretrained"
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name},)
     found_run = False
@@ -58,13 +60,14 @@ def main(prob, group_norm, unet, data_name, noise_type):
         "eval_noise_std2": 1.0,
         "kernel_size1": 101,
         "kernel_size2": 151,
-        #"best_model_filename": "{}_{}_VIT_prob{}_group_norm{}.pth".format(data_name, noise_type, prob, group_norm),
-        "best_model_filename": "{}_{}_VIT_base_line.pth".format(data_name, noise_type),
+        "best_model_filename": "{}_{}_VIT_prob{}_group_norm{}.pth".format(data_name, noise_type, prob, group_norm),
+        #"best_model_filename": "{}_{}_VIT_base_line.pth".format(data_name, noise_type),
         "plot_every_n_epochs": 1,
         "group_norm_groups": group_norm,
         "UNet": unet,
         "data_name": data_name,
-        "noise_type": noise_type
+        "noise_type": noise_type,
+        "pretrained": pretrained
     }
     )
     config = wandb.config
@@ -80,6 +83,10 @@ def main(prob, group_norm, unet, data_name, noise_type):
         model = timm.create_model('vit_tiny_patch16_224',pretrained=True).to(device)
     else:
         model = timm.create_model('vit_tiny_patch16_224', pretrained=True).to(device)
+    if config.pretrained:
+        print("Loading pretrained weights...")
+        name = f"{config.data_name}_{config.noise_type}_VIT_base_line.pth"
+        model.load_state_dict(torch.load(name))
     if config.group_norm_groups > 0:
         print(f"Replacing LayerNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_vit_layernorm_with_groupnorm(model, num_groups=config.group_norm_groups)
@@ -111,21 +118,21 @@ def main(prob, group_norm, unet, data_name, noise_type):
     wandb.finish()
 
 if __name__ == "__main__":
-    data_names = ["gtsrb", "imagenette"]
+    '''data_names = ["gtsrb", "imagenette"]
     noise_types = ["gaussian", "motion_blur"]
     for data_name in data_names:
         for noise_type in noise_types:
             main(prob=0., group_norm=0, unet=False, data_name=data_name, noise_type=noise_type)
-    
-    '''data_names = ["gtsrb","imagenette"]
-    noise_type = ["gaussian","motion_blur"]
+    '''
+    data_names = ["gtsrb"]
+    noise_type = ["gaussian"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [False,True]
+            unet_options = [True]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise)
-        '''
+                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+        

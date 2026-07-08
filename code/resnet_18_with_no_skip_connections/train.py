@@ -9,14 +9,16 @@ if parent_dir not in sys.path:
 from Unet import  UNetWrapper
 from resnet_18.visualizer import *
 
-def main(prob, group_norm,Unet,data_name,noise_type):
+def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
     if prob == 0.5:
         target_run_name = "{}_{}_Modifiedresnet18_group_norm{}_Unet_{}".format(data_name, noise_type, group_norm, Unet)
     else:
         target_run_name = "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}".format(data_name, noise_type, prob, group_norm, Unet)
-    target_run_name = "{}_{}_Modifiedresnet18_base_line".format(data_name, noise_type)
+    if pretrained:
+        target_run_name = f"{target_run_name}_pretrained"
+    #target_run_name = "{}_{}_Modifiedresnet18_base_line".format(data_name, noise_type)
     api = wandb.Api()
     runs = api.runs(path=f"{entity_name}/{project_name}", filters={"display_name": target_run_name})
     found_run = False
@@ -53,15 +55,16 @@ def main(prob, group_norm,Unet,data_name,noise_type):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "kernel_size1": 101,
-            "kernel_size2": 151,
-            #"best_model_filename": "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
-            "best_model_filename": "{}_{}_Modifiedresnet18_base_line.pth".format(data_name, noise_type),
+            "kernel_size1": 31,
+            "kernel_size2": 101,
+            "best_model_filename": "{}_{}_Modifiedresnet18_prob{}_group_norm{}_Unet_{}.pth".format(data_name, noise_type, prob, group_norm, Unet),
+            #"best_model_filename": "{}_{}_Modifiedresnet18_base_line.pth".format(data_name, noise_type),
             "plot_every_n_epochs": 1,
             "group_norm_groups": group_norm,
             "UNet": Unet,
             "data_name": data_name,
-            "noise_type": noise_type
+            "noise_type": noise_type,
+            "pretrained": pretrained
         }
     )
     
@@ -74,7 +77,10 @@ def main(prob, group_norm,Unet,data_name,noise_type):
         train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_motion_blure(config=config)
     print("Downloading/Loading pretrained ResNet18...")
     model = create_resnet18_without_skip()
-    
+    if config.pretrained:
+        print("Loading pretrained weights...")
+        name = f"{config.data_name}_{config.noise_type}_Modifiedresnet18.pth"
+        model.load_state_dict(torch.load(name))
     if config.group_norm_groups > 0:
         print(f"Replacing BatchNorm with GroupNorm (groups={config.group_norm_groups})...")
         model = replace_bn_with_gn(model, num_groups=config.group_norm_groups)
@@ -105,21 +111,21 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_names = ["gtsrb", ]
+    '''data_names = ["gtsrb", ]
     noise_types = ["gaussian"]
     for data_name in data_names:
         for noise_type in noise_types:
             main(prob=0., group_norm=0, Unet=False, data_name=data_name, noise_type=noise_type)
-    
-    '''data_names = ["imagenette"]
+    '''
+    data_names = ["imagenette"]
     noise_type = ["gaussian"]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [False,True]
+            unet_options = [True]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise)
-    '''
+                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+    
