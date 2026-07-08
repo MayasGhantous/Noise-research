@@ -681,7 +681,7 @@ def train_model(model, train_loader, val_loader, val_loader2,val_loader3, criter
     Trains the model on the training dataset and evaluates on the validation dataset.
     """
     print("\nStarting training...")
-    best_accuracy = 0.0
+    best_accuracy = evaluate_model(model, val_loader2, device, description="Initial Validation Accuracy")
     num_epochs = config.num_epochs
     plot_every_n_epochs = config.plot_every_n_epochs
 

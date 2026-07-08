@@ -105,8 +105,8 @@ def main(prob, group_norm,Unet,data_name,noise_type):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_names = ["gtsrb", "imagenette"]
-    noise_types = ["gaussian", "motion_blur"]
+    data_names = ["gtsrb", ]
+    noise_types = ["gaussian"]
     for data_name in data_names:
         for noise_type in noise_types:
             main(prob=0., group_norm=0, Unet=False, data_name=data_name, noise_type=noise_type)
