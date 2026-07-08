@@ -49,8 +49,8 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
             "train_noise_prob": prob,
             "eval_noise_std1": 0.5,
             "eval_noise_std2": 1.0,
-            "kernel_size1": 31,
-            "kernel_size2": 151,
+            "kernel_size1": 51,
+            "kernel_size2": 91,
             "best_model_filename": f"{target_run_name}.pth",
             #"best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
             "plot_every_n_epochs": 1,
@@ -119,8 +119,8 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     wandb.finish()
     
 if __name__ == "__main__":
-    data_names = ["gtsrb", "imagenette"]
-    noise_types = ["gaussian"]
+    data_names = ["imagenette", "gtsrb"]
+    noise_types = ["motion_blur", "gaussian"]
     for data_name in data_names:
         for noise in noise_types:
             probs = [0.5]
