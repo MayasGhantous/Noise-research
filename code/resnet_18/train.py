@@ -125,7 +125,7 @@ if __name__ == "__main__":
         for noise in noise_types:
             probs = [0.5]
             group_norms = [0,8]
-            unet_options = [False,True]
+            unet_options = [True]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:

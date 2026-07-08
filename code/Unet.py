@@ -87,6 +87,9 @@ class UNetWrapper(nn.Module):
         super(UNetWrapper, self).__init__()
         self.unet = UNetPreProcessor(in_channels=in_channels, out_channels=out_channels, base_features=base_features)
         self.base_model = base_model
+        #do not compute gradients for the base model
+        '''for param in self.base_model.parameters():
+            param.requires_grad = False'''
 
     def forward(self, x):
         # Pass input through U-Net
