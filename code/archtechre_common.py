@@ -115,6 +115,34 @@ class AddGaussianNoise(object):
         noise = torch.randn(tensor.size()) * self.std + self.mean
         return tensor + noise
 
+# Algorithm taken from ImageNetC code
+class AddDefocusBlur(object):
+    def __init__(self, severity=1):
+        self.c = [(3, 0.1), (4, 0.5), (6, 0.5), (8, 0.5), (10, 0.5), (25, 0.5)][severity - 1]
+
+    def __call__(self, tensor):
+        tensor = np.array(tensor)
+        kernel = self.disk(radius=self.c[0], alias_blur=self.c[1])
+        channels = []
+        for d in range(3):
+            channels.append(cv2.filter2D(tensor[d, :, :], -1, kernel))
+        channels = np.array(channels)  
+        return torch.from_numpy(np.clip(channels, 0, 1))
+    
+    def disk(self, radius, alias_blur=0.1, dtype=np.float32):
+        if radius <= 8:
+            L = np.arange(-8, 8 + 1)
+            ksize = (3, 3)
+        else:
+            L = np.arange(-radius, radius + 1)
+            ksize = (5, 5)
+        X, Y = np.meshgrid(L, L)
+        aliased_disk = np.array((X ** 2 + Y ** 2) <= radius ** 2, dtype=dtype)
+        aliased_disk /= np.sum(aliased_disk)
+
+        # supersample disk to antialias
+        return cv2.GaussianBlur(aliased_disk, ksize=ksize, sigmaX=alias_blur)
+    
 # --- Evaluation Function ---
 def evaluate_model(model, dataloader, device, description=""):
     correct = 0
