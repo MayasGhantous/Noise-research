@@ -58,8 +58,8 @@ def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
         "train_noise_prob": prob,
         "eval_noise_std1": 0.5,
         "eval_noise_std2": 1.0,
-        "kernel_size1": 31,
-        "kernel_size2": 151,
+        "kernel_size1": 51,
+        "kernel_size2": 91,
         "best_model_filename": f"{target_run_name}.pth",
         #"best_model_filename": "{}_{}_VIT_base_line.pth".format(data_name, noise_type),
         "plot_every_n_epochs": 1,
@@ -131,6 +131,7 @@ if __name__ == "__main__":
     '''
     data_names = ["gtsrb", "imagenette"]
     noise_type = ["gaussian", "motion_blur"]
+    pretraineds = [True, False]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
@@ -139,5 +140,6 @@ if __name__ == "__main__":
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+                        for pretrained in pretraineds:
+                            main(prob, group_norm, unet, data_name, noise, pretrained=pretrained)
         
