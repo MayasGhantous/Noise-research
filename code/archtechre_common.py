@@ -117,8 +117,8 @@ class AddGaussianNoise(object):
 
 # Algorithm taken from ImageNetC code
 class AddDefocusBlur(object):
-    def __init__(self, severity=1):
-        self.c = [(3, 0.1), (4, 0.5), (6, 0.5), (8, 0.5), (10, 0.5), (25, 0.5)][severity - 1]
+    def __init__(self, radius):
+        self.c = (radius,0.5)
 
     def __call__(self, tensor):
         tensor = np.array(tensor)
@@ -225,6 +225,35 @@ def get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=15, kernel_size
         dataset_clean = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_clean)
         dataset_noise1 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_noise_std1)
         dataset_noise2 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_noise_std2)
+
+    loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
+    loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
+    loader_noise2 = DataLoader(dataset_noise2, batch_size=batch_size, shuffle=False, num_workers=2)
+
+    return loader_clean, loader_noise1, loader_noise2
+
+def get_test_loaders_for_defocus(batch_size=32, rad1=10, rad2=25, data_name=IMAGENETTE):
+    base_transforms = [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+    ]
+    
+    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    transform_clean = transforms.Compose([*base_transforms, normalization])
+    transform_defocus_rad1 = transforms.Compose([*base_transforms, AddDefocusBlur(radius=rad1), normalization])
+    transform_defocus_rad2 = transforms.Compose([*base_transforms, AddDefocusBlur(radius=rad2), normalization])
+
+    print("Loading validation datasets with different noise profiles...")
+    if data_name == IMAGENETTE:
+        dataset_clean = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_clean, target_transform=map_class_to_imagenet)
+        dataset_noise1 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_defocus_rad1, target_transform=map_class_to_imagenet)
+        dataset_noise2 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_defocus_rad2, target_transform=map_class_to_imagenet)
+    elif data_name == GTSRB:
+        dataset_clean = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_clean)
+        dataset_noise1 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_defocus_rad1)
+        dataset_noise2 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_defocus_rad2)
 
     loader_clean = DataLoader(dataset_clean, batch_size=batch_size, shuffle=False, num_workers=2)
     loader_noise1 = DataLoader(dataset_noise1, batch_size=batch_size, shuffle=False, num_workers=2)
@@ -378,6 +407,80 @@ def get_traing_val_test_loaders_for_motion_blure(config):
         dataset_clean = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_clean)
         dataset_noise1 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_noise_std1)
         dataset_noise2 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_noise_std2)
+        
+    loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    
+    return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
+
+def get_traing_val_test_loaders_for_defocus_blur(config):
+    base_transforms = [
+        transforms.Resize(config.image_resize),
+        transforms.CenterCrop(config.image_crop),
+        transforms.ToTensor(),
+    ]
+    
+    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    transform_clean = transforms.Compose([*base_transforms, normalization])
+    transform_defocus_rad1 = transforms.Compose([*base_transforms, AddDefocusBlur(radius=config.radius1), normalization])
+    transform_defocus_rad2 = transforms.Compose([*base_transforms, AddDefocusBlur(radius=config.radius2), normalization])
+    
+    train_transform = transforms.Compose([
+        *base_transforms,
+        transforms.RandomApply([AddDefocusBlur(radius=config.radius1)], p=config.train_noise_prob), 
+        normalization
+    ])
+
+    if config.data_name == IMAGENETTE:
+        train_dataset1 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_defocus_rad1, target_transform=map_class_to_imagenet)
+    else:
+        train_dataset1 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_defocus_rad1)
+        
+    dataset_size = len(train_dataset1)
+    train_size = int(config.train_split_ratio * dataset_size)    
+    generator = torch.Generator().manual_seed(config.seed)
+    indices = torch.randperm(dataset_size, generator=generator).tolist()
+
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:]
+
+    if config.data_name == IMAGENETTE:
+        train_dataset2 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_clean, target_transform=map_class_to_imagenet)
+        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
+        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
+        
+        train_dataset3 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=train_transform, target_transform=map_class_to_imagenet)
+        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
+
+        train_dataset4 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_defocus_rad2, target_transform=map_class_to_imagenet)
+        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
+    else:
+        train_dataset2 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_clean)
+        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
+        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
+        
+        train_dataset3 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=train_transform)
+        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
+
+        train_dataset4 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_defocus_rad2)
+        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
+
+    train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
+    val_loader = DataLoader(val_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    val_loader2 = DataLoader(val2_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    val_loader3 = DataLoader(val3_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    
+    print("Loading validation datasets with different noise profiles...")
+    if config.data_name == IMAGENETTE:
+        dataset_clean = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_clean, target_transform=map_class_to_imagenet)
+        dataset_noise1 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_defocus_rad1, target_transform=map_class_to_imagenet)
+        dataset_noise2 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_defocus_rad2, target_transform=map_class_to_imagenet)
+    else:
+        dataset_clean = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_clean)
+        dataset_noise1 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_defocus_rad1)
+        dataset_noise2 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_defocus_rad2)
         
     loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
