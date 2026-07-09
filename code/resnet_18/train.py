@@ -51,6 +51,8 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
             "eval_noise_std2": 1.0,
             "kernel_size1": 51,
             "kernel_size2": 91,
+            "radius1": 10,
+            "radius2": 25,
             "best_model_filename": f"{target_run_name}.pth",
             #"best_model_filename": f"{data_name}_{noise_type}_resnet18_base_line.pth",
             "plot_every_n_epochs": 1,
@@ -69,7 +71,8 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
         train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_gaussian(config=config)
     elif config.noise_type == "motion_blur":
         train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_motion_blure(config=config)
-    
+    elif config.noise_type == "defocus_blur":
+        train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2 =get_traing_val_test_loaders_for_defocus_blur(config=config)
     if config.data_name == "imagenette":
         print("Downloading/Loading pretrained ResNet18...")
         model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
@@ -79,7 +82,10 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     if config.pretrained:
         print("Loading pretrained weights...")
         try:
-            name = f"{config.data_name}_{config.noise_type}_resnet18_base_line.pth"
+            if config.noise_type == "defocus_blur":
+                name = f"{config.data_name}_{"gaussian"}_resnet18_base_line.pth"
+            else:
+                name = f"{config.data_name}_{config.noise_type}_resnet18_base_line.pth"
             model.load_state_dict(torch.load(name))
         except FileNotFoundError:
             print("Pretrained weights not found.")
@@ -120,7 +126,8 @@ def main(prob,group_norm,unet,data_name,noise_type, pretrained=False):
     
 if __name__ == "__main__":
     data_names = ["imagenette", "gtsrb"]
-    noise_types = ["motion_blur", "gaussian"]
+    noise_types = ["defocus_blur"]
+    pretraineds = [True, False]
     for data_name in data_names:
         for noise in noise_types:
             probs = [0.5]
@@ -129,5 +136,6 @@ if __name__ == "__main__":
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise, pretrained=False)
+                        for pretrained in pretraineds:
+                            main(prob, group_norm, unet, data_name, noise, pretrained=pretrained)
     
