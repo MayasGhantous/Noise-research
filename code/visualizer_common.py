@@ -130,6 +130,7 @@ def save_figures(data_name, model, visualizer, loader_clean, loader_noise1, load
     for flag1 in flags:
         for flag2 in flags:
             for flag3 in flags:
+                Path(saving_location + f"/{flag1}_{flag2}_{flag3}").mkdir(parents=True, exist_ok=True)
                 with open(saving_location + f"/{flag1}_{flag2}_{flag3}/index_dictionary.json", 'w') as f:
                     json.dump(dictionary[flag1][flag2][flag3]["list"], f, indent=4)
 

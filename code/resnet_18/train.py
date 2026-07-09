@@ -129,5 +129,5 @@ if __name__ == "__main__":
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
-                        main(prob, group_norm, unet, data_name, noise, pretrained=True)
+                        main(prob, group_norm, unet, data_name, noise, pretrained=False)
     
