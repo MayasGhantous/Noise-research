@@ -85,7 +85,7 @@ def main(prob, group_norm,Unet,data_name,noise_type,pretrained = False):
         try:
             print("Loading pretrained weights...")
             if config.noise_type == "defocus_blur":
-                name = f"{config.data_name}_{"gaussian"}_Modifiedresnet18_base_line.pth"
+                name = f"{config.data_name}_gaussian_Modifiedresnet18_base_line.pth"
             else:
                 name = f"{config.data_name}_{config.noise_type}_Modifiedresnet18_base_line.pth"
             model.load_state_dict(torch.load(name))

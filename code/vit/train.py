@@ -90,7 +90,7 @@ def main(prob, group_norm, unet, data_name, noise_type, pretrained=False):
     if config.pretrained:
         print("Loading pretrained weights...")
         if config.noise_type == "defocus_blur":
-            name = f"{config.data_name}_{"gaussian"}_VIT_base_line.pth"
+            name = f"{config.data_name}_gaussian_VIT_base_line.pth"
         else:
             name = f"{config.data_name}_{config.noise_type}_VIT_base_line.pth"
         model.load_state_dict(torch.load(name))
