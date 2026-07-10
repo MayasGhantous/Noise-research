@@ -311,7 +311,7 @@ def get_traing_val_test_loaders(config):
         train_subset2, val2_subset = train_val_split(dataset2, train_indices, val_indices)
         _, val3_subset = train_val_split(dataset3, train_indices, val_indices)
     elif config.train_method == "method1":
-        method1_transform = transforms.Compose([*base_transforms, transforms.RandomApply(noise_transform, p=0.5), normalization])
+        method1_transform = transforms.Compose([*base_transforms, transforms.RandomApply([noise_transform], p=0.5), normalization])
         method1_train_dataset = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=method1_transform, target_transform=map_class_to_imagenet) if config.data_name == IMAGENETTE else TVGTSRB(root=DATA_DIR, split='train', download=True, transform=method1_transform)
         train_subset, _ = train_val_split(method1_train_dataset, train_indices, val_indices)
         _, val_subset = train_val_split(dataset2, train_indices, val_indices)
@@ -319,7 +319,8 @@ def get_traing_val_test_loaders(config):
         _, val3_subset = train_val_split(dataset1, train_indices, val_indices)
 
     train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    train_loader2 = DataLoader(train_subset2, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
+    if config.train_method == "method2":
+        train_loader2 = DataLoader(train_subset2, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
     val_loader = DataLoader(val_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     val_loader2 = DataLoader(val2_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     val_loader3 = DataLoader(val3_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
