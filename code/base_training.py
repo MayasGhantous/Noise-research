@@ -105,11 +105,11 @@ def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False,
         print("Loading pretrained weights...")
         try:
             if model_name == "resnet18":
-                name = 'resenet18_pretrained.pth'
+                name = f'resnet_18/{config.data_name}_resenet18_pretrained.pth'
             elif model_name == "Modifiedresnet18":
-                name = 'Modifiedresnet18_pretrained.pth'
+                name = f'resnet_18_with_no_skip_connections/{config.data_name}_Modifiedresnet18_pretrained.pth'
             elif model_name == "VIT":
-                name = 'VIT_pretrained.pth'
+                name = f'vit/{config.data_name}_VIT_pretrained.pth'
             model.load_state_dict(torch.load(name))
         except FileNotFoundError:
             print("Pretrained weights not found.")
