@@ -12,14 +12,14 @@ if __name__ == "__main__":
         for noise_type in noise_types:
             main(prob=0., group_norm=0, Unet=False, data_name=data_name, noise_type=noise_type)
     '''
-    data_names = ["imagenette"]
-    noise_type = ["motion_blur","gaussian","defocus_blur"]
+    data_names = ["imagenette","gtsrb"]
+    noise_type = ["defocus_blur"]
     pretraineds = [True]
     for data_name in data_names:
         for noise in noise_type:
             probs = [0.5]
             group_norms = [0]
-            unet_options = [True]
+            unet_options = [True, False]
             for prob in probs:
                 for group_norm in group_norms:
                     for unet in unet_options:
