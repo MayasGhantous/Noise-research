@@ -266,7 +266,7 @@ def train_val_split(dataset, train_indices, val_indices):
     val_subset = Subset(dataset, val_indices)
     return train_subset, val_subset
 
-def get_traing_val_test_loaders_for_gaussian(config):
+def get_traing_val_test_loaders(config):
     base_transforms = [
         transforms.Resize(config.image_resize),
         transforms.CenterCrop(config.image_crop),
@@ -275,51 +275,51 @@ def get_traing_val_test_loaders_for_gaussian(config):
     
     normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
+    if config.noise_type == "gaussian":
+        noise_transform = AddGaussianNoise(mean=0.0, std=config.train_noise_std)
+        noise_transofrm2 = AddGaussianNoise(mean=0.0, std=config.eval_noise_std2)
+    elif config.noise_type == "motion_blur":
+        noise_transform = AddMotionBlur(kernel_size=config.kernel_size1)
+        noise_transofrm2 = AddMotionBlur(kernel_size=config.kernel_size2)
+    elif config.noise_type == "defocus_blur":
+        noise_transform = AddDefocusBlur(radius=config.radius1)
+        noise_transofrm2 = AddDefocusBlur(radius=config.radius2)
+
     transform_clean = transforms.Compose([*base_transforms, normalization])
-    transform_noise_std1 = transforms.Compose([*base_transforms, AddGaussianNoise(mean=0.0, std=config.eval_noise_std1), normalization])
-    transform_noise_std2 = transforms.Compose([*base_transforms, AddGaussianNoise(mean=0.0, std=config.eval_noise_std2), normalization])
-    
-    train_transform = transforms.Compose([
-        *base_transforms,
-        transforms.RandomApply([AddGaussianNoise(std=config.train_noise_std)], p=config.train_noise_prob), 
-        normalization
-    ])
+    transform_noise_std1 = transforms.Compose([*base_transforms, noise_transform, normalization])
+    transform_noise_std2 = transforms.Compose([*base_transforms, noise_transofrm2, normalization])
+
 
     if config.data_name == IMAGENETTE:
-        train_dataset1 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+        dataset1 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_clean, target_transform=map_class_to_imagenet)
+        dataset2 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
+        dataset3 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
     else:
-        train_dataset1 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_noise_std1)
+        dataset1 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_clean)
+        dataset2 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_noise_std1)
+        dataset3 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_noise_std2)
                                      
-    dataset_size = len(train_dataset1)
+    dataset_size = len(dataset1)
     train_size = int(config.train_split_ratio * dataset_size)    
     generator = torch.Generator().manual_seed(config.seed)
     indices = torch.randperm(dataset_size, generator=generator).tolist()
 
     train_indices = indices[:train_size]
     val_indices = indices[train_size:]
-
-    if config.data_name == IMAGENETTE:
-        train_dataset2 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_clean, target_transform=map_class_to_imagenet)
-        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
-        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
-        
-        train_dataset3 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=train_transform, target_transform=map_class_to_imagenet)
-        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
-
-        train_dataset4 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
-    else:
-        train_dataset2 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_clean)
-        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
-        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
-        
-        train_dataset3 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=train_transform)
-        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
-
-        train_dataset4 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_noise_std2)
-        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
+    if config.train_method == "method2":
+        train_subset, val_subset = train_val_split(dataset1, train_indices, val_indices)
+        train_subset2, val2_subset = train_val_split(dataset2, train_indices, val_indices)
+        _, val3_subset = train_val_split(dataset3, train_indices, val_indices)
+    elif config.train_method == "method1":
+        method1_transform = transforms.Compose([*base_transforms, transforms.RandomApply(noise_transform, p=0.5), normalization])
+        method1_train_dataset = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=method1_transform, target_transform=map_class_to_imagenet) if config.data_name == IMAGENETTE else TVGTSRB(root=DATA_DIR, split='train', download=True, transform=method1_transform)
+        train_subset, _ = train_val_split(method1_train_dataset, train_indices, val_indices)
+        _, val_subset = train_val_split(dataset2, train_indices, val_indices)
+        _, val2_subset = train_val_split(dataset3, train_indices, val_indices)
+        _, val3_subset = train_val_split(dataset1, train_indices, val_indices)
 
     train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
+    train_loader2 = DataLoader(train_subset2, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
     val_loader = DataLoader(val_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     val_loader2 = DataLoader(val2_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     val_loader3 = DataLoader(val3_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
@@ -337,156 +337,10 @@ def get_traing_val_test_loaders_for_gaussian(config):
     loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    
-    return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
-
-def get_traing_val_test_loaders_for_motion_blure(config):
-    base_transforms = [
-        transforms.Resize(config.image_resize),
-        transforms.CenterCrop(config.image_crop),
-        transforms.ToTensor(),
-    ]
-    
-    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    transform_clean = transforms.Compose([*base_transforms, normalization])
-    transform_noise_std1 = transforms.Compose([*base_transforms, AddMotionBlur(kernel_size=config.kernel_size1), normalization])
-    transform_noise_std2 = transforms.Compose([*base_transforms, AddMotionBlur(kernel_size=config.kernel_size2), normalization])
-    
-    train_transform = transforms.Compose([
-        *base_transforms,
-        transforms.RandomApply([AddMotionBlur(kernel_size=config.kernel_size1)], p=config.train_noise_prob), 
-        normalization
-    ])
-
-    if config.data_name == IMAGENETTE:
-        train_dataset1 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-    else:
-        train_dataset1 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_noise_std1)
-        
-    dataset_size = len(train_dataset1)
-    train_size = int(config.train_split_ratio * dataset_size)    
-    generator = torch.Generator().manual_seed(config.seed)
-    indices = torch.randperm(dataset_size, generator=generator).tolist()
-
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
-
-    if config.data_name == IMAGENETTE:
-        train_dataset2 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_clean, target_transform=map_class_to_imagenet)
-        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
-        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
-        
-        train_dataset3 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=train_transform, target_transform=map_class_to_imagenet)
-        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
-
-        train_dataset4 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
-    else:
-        train_dataset2 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_clean)
-        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
-        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
-        
-        train_dataset3 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=train_transform)
-        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
-
-        train_dataset4 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_noise_std2)
-        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
-
-    train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    val_loader = DataLoader(val_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    val_loader2 = DataLoader(val2_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    val_loader3 = DataLoader(val3_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    
-    print("Loading validation datasets with different noise profiles...")
-    if config.data_name == IMAGENETTE:
-        dataset_clean = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_clean, target_transform=map_class_to_imagenet)
-        dataset_noise1 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_noise_std1, target_transform=map_class_to_imagenet)
-        dataset_noise2 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_noise_std2, target_transform=map_class_to_imagenet)
-    else:
-        dataset_clean = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_clean)
-        dataset_noise1 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_noise_std1)
-        dataset_noise2 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_noise_std2)
-        
-    loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    
-    return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
-
-def get_traing_val_test_loaders_for_defocus_blur(config):
-    base_transforms = [
-        transforms.Resize(config.image_resize),
-        transforms.CenterCrop(config.image_crop),
-        transforms.ToTensor(),
-    ]
-    
-    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    transform_clean = transforms.Compose([*base_transforms, normalization])
-    transform_defocus_rad1 = transforms.Compose([*base_transforms, AddDefocusBlur(radius=config.radius1), normalization])
-    transform_defocus_rad2 = transforms.Compose([*base_transforms, AddDefocusBlur(radius=config.radius2), normalization])
-    
-    train_transform = transforms.Compose([
-        *base_transforms,
-        transforms.RandomApply([AddDefocusBlur(radius=config.radius1)], p=config.train_noise_prob), 
-        normalization
-    ])
-
-    if config.data_name == IMAGENETTE:
-        train_dataset1 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=True, transform=transform_defocus_rad1, target_transform=map_class_to_imagenet)
-    else:
-        train_dataset1 = TVGTSRB(root=DATA_DIR, split='train', download=True, transform=transform_defocus_rad1)
-        
-    dataset_size = len(train_dataset1)
-    train_size = int(config.train_split_ratio * dataset_size)    
-    generator = torch.Generator().manual_seed(config.seed)
-    indices = torch.randperm(dataset_size, generator=generator).tolist()
-
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
-
-    if config.data_name == IMAGENETTE:
-        train_dataset2 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_clean, target_transform=map_class_to_imagenet)
-        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
-        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
-        
-        train_dataset3 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=train_transform, target_transform=map_class_to_imagenet)
-        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
-
-        train_dataset4 = TVImagenette(root=DATA_DIR, split='train', size='160px', download=False, transform=transform_defocus_rad2, target_transform=map_class_to_imagenet)
-        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
-    else:
-        train_dataset2 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_clean)
-        _, val_subset = train_val_split(train_dataset2, train_indices, val_indices)
-        _, val2_subset = train_val_split(train_dataset1, train_indices, val_indices)
-        
-        train_dataset3 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=train_transform)
-        train_subset, _ = train_val_split(train_dataset3, train_indices, val_indices)
-
-        train_dataset4 = TVGTSRB(root=DATA_DIR, split='train', download=False, transform=transform_defocus_rad2)
-        _, val3_subset = train_val_split(train_dataset4, train_indices, val_indices)
-
-    train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    val_loader = DataLoader(val_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    val_loader2 = DataLoader(val2_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    val_loader3 = DataLoader(val3_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    
-    print("Loading validation datasets with different noise profiles...")
-    if config.data_name == IMAGENETTE:
-        dataset_clean = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_clean, target_transform=map_class_to_imagenet)
-        dataset_noise1 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_defocus_rad1, target_transform=map_class_to_imagenet)
-        dataset_noise2 = TVImagenette(root=DATA_DIR, split='val', size='160px', download=True, transform=transform_defocus_rad2, target_transform=map_class_to_imagenet)
-    else:
-        dataset_clean = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_clean)
-        dataset_noise1 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_defocus_rad1)
-        dataset_noise2 = TVGTSRB(root=DATA_DIR, split='test', download=True, transform=transform_defocus_rad2)
-        
-    loader_clean = DataLoader(dataset_clean, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    loader_noise1 = DataLoader(dataset_noise1, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    loader_noise2 = DataLoader(dataset_noise2, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-    
-    return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
+    if config.train_method == "method2":
+        return train_loader, train_loader2, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
+    elif config.train_method == "method1":
+        return train_loader, val_loader, val_loader2, val_loader3, loader_clean, loader_noise1, loader_noise2
 
 def train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, prog_vis=None, config=None):
     print("\nStarting training...")
@@ -553,6 +407,93 @@ def train_model(model, train_loader, val_loader, val_loader2, val_loader3, crite
             wandb.run.summary["best_val_accuracy_noisy"] = best_accuracy
 
     print("Training completed.")
+
+def train_model2(model, train_loader,train_loader2, val_loader, val_loader2, val_loader3, criterion, optimizer, device, prog_vis=None, config=None):
+    print("\nStarting training...")
+    best_accuracy = evaluate_model(model, val_loader2, device, description="Initial Validation Accuracy")
+    num_epochs = config.num_epochs
+    plot_every_n_epochs = config.plot_every_n_epochs
+
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
+
+        for (images1, labels1), (images2, labels2) in tqdm.tqdm(zip(train_loader, train_loader2), desc=f"Epoch {epoch + 1}/{num_epochs}"):
+            images1 = images1.to(device)
+            labels1 = labels1.to(device)
+            images2 = images2.to(device)
+            labels2 = labels2.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(images1)
+            loss = criterion(outputs, labels1)
+            loss += criterion(model(images2), labels2)
+            if config.UNet:
+                unet = model.get_unet()
+                unet_loss = torch.nn.MSELoss()(unet(images2), unet(images1))  # Add reconstruction loss for UNet
+                loss += unet_loss
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            total += labels1.size(0)
+            correct += (predicted == labels1).sum().item()
+            total += labels2.size(0)
+            correct += (predicted == labels2).sum().item()
+
+        epoch_loss = running_loss / len(train_loader)
+        epoch_accuracy = 100 * correct / total
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%")
+
+        clean_acc = evaluate_model(model, val_loader, device, description=f"Validation after Epoch {epoch + 1}")
+        noisy_acc = evaluate_model(model, val_loader2, device, description=f"Validation with Noise after Epoch {epoch + 1}")
+        higher_order_acc = evaluate_model(model, val_loader3, device, description=f"Validation with Higher Order Noise after Epoch {epoch + 1}")
+        
+        wandb.log({
+            "Epoch_accuracy": epoch_accuracy,
+            "Clean Validation Accuracy": clean_acc,
+            "Noisy Validation Accuracy": noisy_acc,
+            "Higher Order Validation Accuracy": higher_order_acc,
+            "Epoch Training Loss": epoch_loss / len(train_loader)
+        })
+
+        if prog_vis and (epoch + 1) % plot_every_n_epochs == 0:
+            rand_idx = random.randint(0, len(val_loader.dataset) - 1)
+            img, true_label = val_loader.dataset[rand_idx]
+            img2, _ = val_loader2.dataset[rand_idx]
+            img3, _ = val_loader3.dataset[rand_idx]
+            
+            img_clean = img.squeeze(0).to(device)
+            img_noisy = img2.squeeze(0).to(device)
+            img_higher_order = img3.squeeze(0).to(device)
+            
+            fig = prog_vis.extract_and_return_figure(config.data_name, torch.stack([img_clean, img_noisy, img_higher_order]), [true_label, true_label, true_label])
+            
+            wandb.log({f"Network Progression ": wandb.Image(fig)})
+            plt.close(fig)
+
+        if best_accuracy <= noisy_acc:
+            best_accuracy = noisy_acc
+            torch.save(model.state_dict(), wandb.config.best_model_filename)
+            print(f"New best model saved as '{wandb.config.best_model_filename}' with accuracy: {best_accuracy:.2f}%")
+            wandb.run.summary["best_val_accuracy_noisy"] = best_accuracy
+
+    print("Training completed.")
+
+def test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.5, std2=1.0):
+    clean_accuracy = evaluate_model(model, loader_clean, device, "Baseline (Clean Images)")
+    noise1_accuracy = 0
+    noise2_accuracy = 0
+    for _ in range(2): 
+        noise1_accuracy += evaluate_model(model, loader_noise1, device, f"Gaussian Noise (std={std1})")
+        noise2_accuracy += evaluate_model(model, loader_noise2, device, f"Gaussian Noise (std={std2})")
+    print(f"Average Accuracy for Clean Images: {clean_accuracy:.2f}%")
+    print(f"Average Accuracy for Gaussian Noise (std={std1}): {noise1_accuracy / 2:.2f}%")
+    print(f"Average Accuracy for Gaussian Noise (std={std2}): {noise2_accuracy / 2:.2f}%")
+
 
 def test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.5, std2=1.0):
     clean_accuracy = evaluate_model(model, loader_clean, device, "Baseline (Clean Images)")

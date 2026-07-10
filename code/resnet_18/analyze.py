@@ -26,6 +26,8 @@ def main(dataset_name, model_name, group_norm, unet, noise_type, models_location
         loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=dataset_name)
     elif noise_type == "motion_blur":
         loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=51, kernel_size2=91, data_name=dataset_name)
+    elif noise_type == "defocus blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_defocus_blur(batch_size=32, kernel_size1=51, kernel_size2=91, data_name=dataset_name)   
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = load_model(model_name,group_norm,unet,models_location)
     model = model.to(device)
