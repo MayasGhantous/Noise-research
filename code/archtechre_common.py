@@ -496,16 +496,6 @@ def test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std
     print(f"Average Accuracy for Gaussian Noise (std={std2}): {noise2_accuracy / 2:.2f}%")
 
 
-def test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.5, std2=1.0):
-    clean_accuracy = evaluate_model(model, loader_clean, device, "Baseline (Clean Images)")
-    noise1_accuracy = 0
-    noise2_accuracy = 0
-    for _ in range(2): 
-        noise1_accuracy += evaluate_model(model, loader_noise1, device, f"Gaussian Noise (std={std1})")
-        noise2_accuracy += evaluate_model(model, loader_noise2, device, f"Gaussian Noise (std={std2})")
-    print(f"Average Accuracy for Clean Images: {clean_accuracy:.2f}%")
-    print(f"Average Accuracy for Gaussian Noise (std={std1}): {noise1_accuracy / 2:.2f}%")
-    print(f"Average Accuracy for Gaussian Noise (std={std2}): {noise2_accuracy / 2:.2f}%")
 if __name__ == "__main__":
     data_loaders1, data_loaders2, data_loaders3 = get_test_loaders_for_gaussian(data_name=GTSRB)
     # 1. Grab a single batch of training data

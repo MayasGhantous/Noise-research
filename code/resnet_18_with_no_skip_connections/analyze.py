@@ -19,26 +19,31 @@ def load_model(model_name,group_norm,unet,models_location):
     model.load_state_dict(torch.load(models_location+f"/{model_name}"))
     return model
 
-def main(dataset_name, model_name, group_norm, unet, gaussian, models_location = str(Path(__file__).parent)+"/models"):
-    if gaussian:
+def main(dataset_name, model_name, group_norm, unet, noise_type, models_location = str(Path(__file__).parent)):
+    if noise_type == "gaussian":
         loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=dataset_name)
-    else:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=101, kernel_size2=151, data_name=dataset_name)
+    elif noise_type == "motion_blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=51, kernel_size2=91, data_name=dataset_name)
+    elif noise_type == "defocus_blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_defocus(batch_size=32, rad1=10, rad2=25, data_name=dataset_name)
     model = load_model(model_name,group_norm,unet,models_location)
     model.eval()
     if(unet):
         model_visualizer = ResNet18FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
     else:
         model_visualizer = ResNet18FeatureVisualizer(model)
-    if gaussian:
-        saving_location = str(Path(__file__).parent)+"/analysis_results/gaussian"+model_name
-    else:
-        saving_location = str(Path(__file__).parent)+"/analysis_results/motion"+model_name
+    saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name
     #test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.5, std2=1.0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     save_figures(model, model_visualizer, loader_clean, loader_noise1, loader_noise2,device , saving_location, max_samples=5)
     # save_features(model,model_visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location)
 
 if __name__ == "__main__":
-    main("imagenette", "base.pth", group_norm=0, unet=False, gaussian=True)
-    save_fft_map_for_an_index("imagenette", "motion_base.pth", group_norm=0, unet=False, index=50, gaussian=True, load_model=load_model, saving_location=str(Path(__file__).parent)+"/analysis_results", models_location=str(Path(__file__).parent))
+    data_sets = []
+    models_name =[]
+    group_norms = []
+    unets = []
+    noise_types = []
+    for data_name,model_name, group_norm, unet, noise_type in zip(data_sets, models_name, group_norms, unets, noise_types):
+        main(data_name, model_name, group_norm, unet, noise_type)
+    #save_fft_map_for_an_index("imagenette", "motion_base.pth", group_norm=0, unet=False, index=50, gaussian=True, load_model=load_model, saving_location=str(Path(__file__).parent)+"/analysis_results", models_location=str(Path(__file__).parent))
