@@ -22,30 +22,32 @@ def load_model(model_name,group_norm,unet,models_location):
     return model
 
 
-def main(data_name, model_name, group_norm, unet, gaussian, models_location = str(Path(__file__).parent)+"/models"):
-    if gaussian:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=data_name)
-    else:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=101, kernel_size2=151, data_name=data_name)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def main(dataset_name, model_name, group_norm, unet, noise_type, models_location = str(Path(__file__).parent)):
+    if noise_type == "gaussian":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=dataset_name)
+    elif noise_type == "motion_blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=51, kernel_size2=91, data_name=dataset_name)
+    elif noise_type == "defocus_blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_defocus(batch_size=32, rad1=10, rad2=25, data_name=dataset_name)
     model = load_model(model_name,group_norm,unet,models_location)
-    model = model.to(device)
     model.eval()
     if(unet):
         model_visualizer = ViTBatchAttentionVisualizer(model.get_base_model(), unet=model.get_unet())
     else:
         model_visualizer = ViTBatchAttentionVisualizer(model)
-    if gaussian:
-        saving_location = str(Path(__file__).parent)+"/analysis_results/gaussian"+model_name
-    else:
-        saving_location = str(Path(__file__).parent)+"/analysis_results/motion"+model_name
+    saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name
     #test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.5, std2=1.0)
-    save_figures(model, model_visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location, max_samples=5)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    save_figures(model, model_visualizer, loader_clean, loader_noise1, loader_noise2,device , saving_location, max_samples=5)
     # save_features(model,model_visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location)
+
+
 if __name__ == "__main__":
-    #model = load_model("gtsrb_gaussian_VIT_prob0.5_group_norm8.pth", group_norm=8, unet=True, models_location = str(Path(__file__).parent)+"/models")
-    #loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.05, std2=0.1, data_name="gtsrb")
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.05, std2=0.1)
-    #main("imagenette","motion_vit_prob0_group_norm0_Unet_True.pth",group_norm = 0, unet=True,gaussian = False)
-    save_fft_map_for_an_index("gtsrb", "gtsrb_gaussian_VIT_prob0.5_group_norm8.pth",group_norm = 0, unet=True, index=50,gaussian = False, load_model=load_model, saving_location = str(Path(__file__).parent)+"/analysis_results",models_location = str(Path(__file__).parent)+"/models")
+    data_sets = []
+    models_name =[]
+    group_norms = []
+    unets = []
+    noise_types = []
+    for data_name,model_name, group_norm, unet, noise_type in zip(data_sets, models_name, group_norms, unets, noise_types):
+        main(data_name, model_name, group_norm, unet, noise_type)

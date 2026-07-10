@@ -8,7 +8,7 @@ from base_training import *
 if __name__ == "__main__":
     data_names = ["imagenette"]
     noise_types = ["defocus_blur","motion_blur","gaussian"]
-    pretraineds = [True, False]
+    pretraineds = [True]
     for data_name in data_names:
         for noise in noise_types:
             probs = [0.5]
