@@ -22,6 +22,7 @@ def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False,
             target_run_name = f"{data_name}_{noise_type}_Modifiedresnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
         elif model_name == "VIT":
             target_run_name = f"{data_name}_{noise_type}_VIT_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+    target_run_name = f"{target_run_name}_{train_method}"
     #target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
     if pretrained:
         target_run_name = f"{target_run_name}_pretrained"
@@ -77,7 +78,7 @@ def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False,
             "UNet": unet,
             "data_name": data_name,
             "noise_type": noise_type,
-            "pretrained": pretrained
+            "pretrained": pretrained,
             "train_method": train_method
         }
     )
