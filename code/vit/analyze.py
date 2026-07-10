@@ -44,10 +44,13 @@ def main(dataset_name, model_name, group_norm, unet, noise_type, models_location
 
 
 if __name__ == "__main__":
-    data_sets = []
-    models_name =[]
-    group_norms = []
-    unets = []
-    noise_types = []
+    data_sets = ["gtsrb"]
+    models_name =["imagenette_motion_blur_VIT_base_line.pth"]
+    group_norms = [0]
+    unets = [False]
+    noise_types = ["motion_blur"]
     for data_name,model_name, group_norm, unet, noise_type in zip(data_sets, models_name, group_norms, unets, noise_types):
-        main(data_name, model_name, group_norm, unet, noise_type)
+        #main(data_name, model_name, group_norm, unet, noise_type)
+        saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name+"/individual_figures"
+        save_figure_for_index(data_name, model_name, group_norm, unet, noise_type, index=80, models_location=str(Path(__file__).parent), saving_location=saving_location, load_model=load_model, model_type="VIT")
+    

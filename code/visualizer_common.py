@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
 from archtechre_common import *
+from resnet_18.visualizer import ResNet18FeatureVisualizer
+from vit.visualizer import ViTBatchAttentionVisualizer
 
 def analyze_batches(data_name, model, 
                     batch_clean_images, batch_clean_preds,
@@ -46,7 +48,72 @@ def analyze_batches(data_name, model,
             
     return fig
 
+def get_figurs_for_an_index(data_name,model,visualizer, loader_clean, loader_noise1, loader_noise2, device, index):
+    sample_images = []
+    sample_tensors = []
+    img_clean,clean_label = loader_clean.dataset[index]
+    img_noise1,noisy1_label = loader_noise1.dataset[index]
+    img_noise2,noisy2_label = loader_noise2.dataset[index]
+    img_clean = img_clean.to(device)
+    img_noise1 = img_noise1.to(device)
+    img_noise2 = img_noise2.to(device)
 
+    # 3. Calculate predictions for the ENTIRE batch at once
+    model.eval()
+    with torch.no_grad():
+        preds_clean = torch.argmax(model(img_clean.unsqueeze(0)), dim=1)
+        preds_noise1 = torch.argmax(model(img_noise1.unsqueeze(0)), dim=1)
+        preds_noise2 = torch.argmax(model(img_noise2.unsqueeze(0)), dim=1)
+
+    sample_images.append(denormalize(img_clean.cpu()).permute(1, 2, 0).numpy())
+    sample_tensors.append(img_clean.unsqueeze(0).to(device))
+    
+    sample_images.append(denormalize(img_noise1.cpu()).permute(1, 2, 0).numpy())
+    sample_tensors.append(img_noise1.unsqueeze(0).to(device))
+    
+    sample_images.append(denormalize(img_noise2.cpu()).permute(1, 2, 0).numpy())
+    sample_tensors.append(img_noise2.unsqueeze(0).to(device))
+
+    predicted_labels = [
+        get_class_name(data_name=data_name, class_idx=preds_clean.item()),
+        get_class_name(data_name=data_name, class_idx=preds_noise1.item()),
+        get_class_name(data_name=data_name, class_idx=preds_noise2.item())
+    ]
+    fig1 = display_multiple_images_progress(model, sample_tensors, sample_images, predicted_labels)   
+    fig2 = visualizer.extract_and_return_figure(data_name,torch.stack([img_clean, img_noise1, img_noise2]), [clean_label, noisy1_label, noisy2_label])
+      
+    return fig1, fig2
+    
+    
+    
+def save_figure_for_index(dataset_name, model_name, group_norm, unet, noise_type, index, models_location, saving_location,model_type,load_model):
+    if noise_type == "gaussian":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=dataset_name)
+    elif noise_type == "motion_blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=51, kernel_size2=91, data_name=dataset_name)
+    elif noise_type == "defocus_blur":
+        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_defocus(batch_size=32, rad1=10, rad2=25, data_name=dataset_name)
+    model = load_model(model_name,group_norm,unet,models_location)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
+    if(unet):
+        if model_type == "VIT":
+            model_visualizer = ViTBatchAttentionVisualizer(model.get_base_model(), unet=model.get_unet())
+        else:
+            model_visualizer = ResNet18FeatureVisualizer(model.get_base_model(), unet=model.get_unet())
+    else:
+        if model_type == "VIT":
+            model_visualizer = ViTBatchAttentionVisualizer(model)
+        else:
+            model_visualizer = ResNet18FeatureVisualizer(model)
+    
+    Path(saving_location).mkdir(parents=True, exist_ok=True)
+    fig1, fig2 = get_figurs_for_an_index(dataset_name, model, model_visualizer, loader_clean, loader_noise1, loader_noise2, device, index)
+    fig1.savefig(saving_location+f"/heat_map{index }.png")
+    fig2.savefig(saving_location+f"/feature_map{index }.png")
+
+    
 
 def save_figures(data_name, model, visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location, max_samples=5):
     i = 0
