@@ -16,6 +16,7 @@ data/
 *.tar
 *.gz
 *.zip
+*.csv
 
 # 3. Python Cache & Environments
 __pycache__/

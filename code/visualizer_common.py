@@ -112,6 +112,9 @@ def save_figure_for_index(dataset_name, model_name, group_norm, unet, noise_type
     fig1, fig2 = get_figurs_for_an_index(dataset_name, model, model_visualizer, loader_clean, loader_noise1, loader_noise2, device, index)
     fig1.savefig(saving_location+f"/heat_map{index }.png")
     fig2.savefig(saving_location+f"/feature_map{index }.png")
+    plt.close(fig1)
+    plt.close(fig2)
+
 
     
 
@@ -311,7 +314,7 @@ def get_default_target_layers(model):
 
     # --- 3. Check for Vision Transformer ---
     elif 'VisionTransformer' in inspect_name:
-        #print(f"Detected ViT architecture ({inspect_name}). Defaulting to specific Block Norms.")
+        #print(f"Detected ViT architecture ({inspect_name}). Picking specific Block Norms.")
         target_layers = [
             model_to_inspect.blocks[0].norm1,
             model_to_inspect.blocks[5].norm1,
