@@ -311,7 +311,7 @@ def get_default_target_layers(model):
 
     # --- 3. Check for Vision Transformer ---
     elif 'VisionTransformer' in inspect_name:
-        #print(f"Detected ViT architecture ({inspect_name}). Defaulting to specific Block Norms.")
+        #print(f"Detected ViT architecture ({inspect_name}). Picking specific Block Norms.")
         target_layers = [
             model_to_inspect.blocks[0].norm1,
             model_to_inspect.blocks[5].norm1,

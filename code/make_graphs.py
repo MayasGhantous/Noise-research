@@ -1,6 +1,11 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import timm
+
+#print(timm.create_model('vit_tiny_patch16_224',pretrained=False))
+#exit()
+
 
 CSV_PATH = "csv_files"
 PLT_PATH = "plots"
