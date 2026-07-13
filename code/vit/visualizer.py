@@ -81,7 +81,7 @@ class ViTBatchAttentionVisualizer:
             # ==========================================
 
             # 5. Process Heatmaps
-            cls_attention = attn[:, :, 0, 1:] 
+            cls_attention = attn[:, :, 0, 1:] # taking attention with the classification token.
             cls_attention = cls_attention.mean(dim=1) 
             
             grid_size = int(np.sqrt(cls_attention.shape[1]))
