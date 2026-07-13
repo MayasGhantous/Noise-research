@@ -49,16 +49,16 @@ def main(dataset_name, model_name, group_norm, unet, noise_type, models_location
 
 if __name__ == "__main__":
     data_sets = ["gtsrb", "gtsrb", "gtsrb", "gtsrb"]
-    models_name =["gtsrb_motion_blur_VIT_group_norm8_Unet_True.pth", 
-                  "gtsrb_motion_blur_VIT_group_norm8_Unet_False.pth",
-                  "gtsrb_defocus_blur_VIT_group_norm8_Unet_True.pth", "gtsrb_defocus_blur_VIT_group_norm8_Unet_False.pth"]
+    models_name =["gtsrb_motion_blur_VIT_group_norm8_Unet_True_pretrained.pth", 
+                  "gtsrb_motion_blur_VIT_group_norm8_Unet_False_pretrained.pth",
+                  "gtsrb_defocus_blur_VIT_group_norm8_Unet_True_pretrained.pth", "gtsrb_defocus_blur_VIT_group_norm8_Unet_False_pretrained.pth"]
     group_norms = [8, 8, 8, 8]
     unets = [True,False, True, False]
     noise_types = ["motion_blur", "motion_blur", "defocus_blur", "defocus_blur"]
     for data_name,model_name, group_norm, unet, noise_type in zip(data_sets, models_name, group_norms, unets, noise_types):
         #main(data_name, model_name, group_norm, unet, noise_type)
         saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name+"/individual_figures"
-        indexes = [80,81,82,83,84,85]
+        indexes = range(97,107)
         for index in indexes:
             save_figure_for_index(data_name, model_name, group_norm, unet, noise_type, index=index,
                                models_location="C:/Users/1ronk/Documents/Python/Noise-research/code/models", 
