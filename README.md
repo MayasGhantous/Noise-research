@@ -1,9 +1,9 @@
-## Enviroments: 
-we used 2 enviroments the first one for named requirements.txt where requglar opencv-python is included these are for the regular operating systems with GUI.<br>
-the other one requirements_runpods.txt that has opencv-python-headless where the operating system does not have GUI.<br>
+## Environments
+We use 2 environments. The first one is named `requirements.txt`, where regular `opencv-python` is included; these are for regular operating systems with a GUI.<br>
+The other one is `requirements_runpods.txt` that has `opencv-python-headless`, where the operating system does not have a GUI.<br>
 ## training: 
 #### 
-to run the code training, open train.py and use the main funciton from base_traning.<br>
+to run the code training, open the relevant `train.py` (e.g., under `code/`) and use the main function from `base_training.py`.<br>
 ### the parameters of this main: 
 prob(float 0 to 1): means the percen of the datasets that is noisy, if 0 then there is no noisy data in the data set. <br><br>
 group_norm(int): changes the normlization layers of the archtichre to group norm with grop number equlas to group_norm if it is 0 then the base norm is used. 
@@ -21,7 +21,7 @@ model_name(string): is the model type you need to train it should be "resnet18",
 <br><br>
 pretrained(boolean): means if you want to use a pretrained model on the clean dataset 
 <br><br>
-train_meathond(string): it should be "method1" or "method2", where method1 is the regular CrossEntropyLoss and for meathed 2 we added another loss and MSE loss that makes the Unet output for the noisy image and the regualr the same. 
+train_method(string): it should be "method1" or "method2", where method1 is the regular CrossEntropyLoss and for method2 we added another loss and an MSE loss that makes the Unet output for the noisy image and the regular the same. 
 <br> <br>
 notes: 
 1.  if you want to use pretraining then you must have first train th model with prob = 0 , unet = false, grop_norm = 0  and method1, this would save a pretrained model on the model directory.
