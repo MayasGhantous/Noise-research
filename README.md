@@ -29,10 +29,10 @@ notes:
 4. if for some reason the training stops the code handles it just rerun the same command.
 
 ## Analysis
-after traning, each model's directory must have some models that ends with pth, we have 2 function for analyzation.<br><br>
- first is main which will save plots for each compantion of the model reasults on the image, for example if the model got the clean image and noise1 image and did not ge the noise 2 this compenation is true_true_false. <br><br>
-  if the true label is english_springer for example, the code saves at max 5 resutls for true_true_false and the true lable is english spriger, and saves the other resutls on a jason file so we can chick what is the reults of each image so we can see it later if needed. 
-  <br><br>
-the other funciton is called save_figure_for_index it takes almost the same paramters as the main in traning but also get teh models location the saveing locaiton od the results and the load funciton (which every model has in the analyze.py), this function has been implemnted to see how diffrent models cope with the same image and noise.
+After training, each model directory should include `.pth` files. We have two functions for analysis.<br><br>
+The first is `main`, which saves plots for each model output combination on the image. For example, if the model gets the clean image and noise1 image right, but not noise2, the combination is `true_true_false`.<br><br>
+If the true label is `english_springer`, the code saves up to 5 results for `true_true_false` with that true label, and writes the remaining results to a JSON file so you can check each image result later if needed.
 <br><br>
-to make it easer in each analyze.py file we have the implemnted listst and ziped them toghter so we can run the code for number of models at the same time.
+The other function is `save_figure_for_index`. It takes almost the same parameters as `main` in training, and also gets the model locations, the result-saving location, and the load function (which every model has in `analyze.py`). This function is implemented to compare how different models handle the same image and noise.
+<br><br>
+To make this easier, each `analyze.py` file has implemented lists that are zipped together so we can run the code for multiple models at the same time.
