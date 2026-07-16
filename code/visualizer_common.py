@@ -112,6 +112,9 @@ def save_figure_for_index(dataset_name, model_name, group_norm, unet, noise_type
     fig1, fig2 = get_figurs_for_an_index(dataset_name, model, model_visualizer, loader_clean, loader_noise1, loader_noise2, device, index)
     fig1.savefig(saving_location+f"/heat_map{index }.png")
     fig2.savefig(saving_location+f"/feature_map{index }.png")
+    plt.close(fig1)
+    plt.close(fig2)
+
 
     
 
@@ -311,7 +314,7 @@ def get_default_target_layers(model):
 
     # --- 3. Check for Vision Transformer ---
     elif 'VisionTransformer' in inspect_name:
-        #print(f"Detected ViT architecture ({inspect_name}). Defaulting to specific Block Norms.")
+        #print(f"Detected ViT architecture ({inspect_name}). Picking specific Block Norms.")
         target_layers = [
             model_to_inspect.blocks[0].norm1,
             model_to_inspect.blocks[5].norm1,
@@ -389,164 +392,3 @@ def display_multiple_images_progress(model, input_tensors, original_images, labe
             
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
-      
-class LayerFFT:
-    def __init__(self, model, target_layer):
-        self.model = model
-        self.target_layer = target_layer
-        self.model.eval()
-        
-        self.activations = None
-        self.hook_handle = self.target_layer.register_forward_hook(self.save_activation)
-
-    def save_activation(self, module, input, output):
-        self.activations = output
-
-    def remove_hook(self):
-        """Clean up the hook after use to prevent memory leaks."""
-        self.hook_handle.remove()
-
-    def generate_fft(self, input_tensor):
-        # We don't need gradients for FFT
-        with torch.no_grad():
-            _ = self.model(input_tensor)
-            
-        activations = self.activations
-
-        # --- ViT vs CNN Handling ---
-        if len(activations.shape) == 3:
-            # ViT Shape: (Batch, Sequence, Embedding_Dim) -> (B, N, D)
-            B, N, D = activations.shape
-            
-            # Assuming Token 0 is the CLS token, extract the remaining spatial tokens
-            num_spatial_tokens = N - 1
-            h_feat = int(num_spatial_tokens ** 0.5)
-            w_feat = h_feat
-            
-            # Strip CLS token, transpose, and reshape to spatial layout (B, D, H, W)
-            acts = activations[:, 1:, :].transpose(1, 2).reshape(B, D, h_feat, w_feat)
-            
-        elif len(activations.shape) == 4:
-            # CNN Shape: (Batch, Channels, Height, Width)
-            acts = activations
-            
-        else:
-            raise ValueError(f"Unexpected activation shape: {activations.shape}")
-
-        # --- FFT Math ---
-        # 1. Compute 2D FFT on the spatial dimensions of all channels
-        fft_complex = torch.fft.fft2(acts)
-        
-        # 2. Shift the zero-frequency component to the center of the spectrum
-        fft_shifted = torch.fft.fftshift(fft_complex, dim=(-2, -1))
-        
-        # 3. Compute magnitude spectrum
-        magnitude = torch.abs(fft_shifted)
-        
-        # 4. Average the magnitude across all channels in the layer
-        mean_magnitude = torch.mean(magnitude, dim=1, keepdim=True)
-        
-        # 5. Apply Log scale to compress values and make the spectrum visible
-        log_magnitude = 20 * torch.log10(mean_magnitude + 1e-8)
-
-        # Normalize between 0 and 1 for visualization
-        log_magnitude = log_magnitude - log_magnitude.min()
-        log_magnitude = log_magnitude / (log_magnitude.max() + 1e-8)
-
-        return log_magnitude.squeeze().cpu().detach().numpy()
-    
-def display_multiple_images_fft_progress(model, input_tensors, original_images, labels, target_layers=None, layer_names=None, figsize=(16, 10)):
-    """
-    Displays FFT progression of feature maps for multiple images.
-    Automatically detects model type if target_layers is not provided.
-    """
-    
-    if target_layers is None or layer_names is None:
-        target_layers, layer_names = get_default_target_layers(model)
-
-    num_rows = len(input_tensors)
-    num_cols = len(target_layers) + 2  # +2 for Original Image and Label
-    
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
-    
-    # Ensure axes is a 2D array even for a single image
-    if num_rows == 1:
-        axes = np.expand_dims(axes, axis=0)
-        
-    fig.suptitle(f"Feature Map FFT Spectrum ({type(model).__name__})", fontsize=18, y=0.98)
-    
-    for row in range(num_rows):
-        in_tensor = input_tensors[row]
-        orig_image = original_images[row]
-        label = labels[row]
-        
-        # --- Column 0: Original Image ---
-        axes[row, 0].imshow(orig_image)
-        if row == 0:
-            axes[row, 0].set_title("Original Image", fontsize=12, fontweight='bold')
-        axes[row, 0].axis('off')
-        
-        # --- Column 1: Label ---
-        axes[row, 1].text(0.5, 0.5, label, ha='center', va='center', transform=axes[row, 1].transAxes, fontsize=12)
-        if row == 0:
-            axes[row, 1].set_title("Label", fontsize=12, fontweight='bold')
-        axes[row, 1].axis('off')
-
-        # --- Columns 2+: Layer FFTs ---
-        for col, target_layer in enumerate(target_layers):
-            # Generate FFT map using the LayerFFT class
-            fft_extractor = LayerFFT(model, target_layer)
-            fft_map = fft_extractor.generate_fft(in_tensor)
-            
-            # Clean up the hook
-            fft_extractor.remove_hook()
-            
-            ax = axes[row, col + 2]
-            # Use 'magma' or 'viridis' for frequency plots without overlaying on the original image
-            ax.imshow(fft_map, cmap='magma')
-            
-            if row == 0:
-                ax.set_title(layer_names[col], fontsize=12, fontweight='bold')
-            ax.axis('off')
-            
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    return fig
-
-
-
-def save_fft_map_for_an_index(data_name, model_name, group_norm, unet, index, gaussian, saving_location, load_model, models_location):
-    if gaussian:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_gaussian(batch_size=32, std1=0.5, std2=1.0, data_name=data_name)
-    else:
-        loader_clean, loader_noise1, loader_noise2 = get_test_loaders_for_motion_blur(batch_size=32, kernel_size1=51, kernel_size2=91, data_name=data_name)
-    model = load_model(model_name, group_norm, unet, models_location)
-    model.eval()
-
-    sample_images = []
-    sample_tensors = []
-    
-    img_clean = loader_clean.dataset[index][0]
-    img_noise1 = loader_noise1.dataset[index][0]
-    img_noise2 = loader_noise2.dataset[index][0]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    sample_images.append(denormalize(img_clean.cpu()).permute(1, 2, 0).numpy())
-    sample_tensors.append(img_clean.unsqueeze(0).to(device))
-    
-    sample_images.append(denormalize(img_noise1.cpu()).permute(1, 2, 0).numpy())
-    sample_tensors.append(img_noise1.unsqueeze(0).to(device))
-    
-    sample_images.append(denormalize(img_noise2.cpu()).permute(1, 2, 0).numpy())
-    sample_tensors.append(img_noise2.unsqueeze(0).to(device))
-    
-    predicted_labels = [
-        get_class_name(data_name=data_name, class_idx=loader_clean.dataset[index][1]),
-        get_class_name(data_name=data_name, class_idx=loader_noise1.dataset[index][1]),
-        get_class_name(data_name=data_name, class_idx=loader_noise2.dataset[index][1])
-    ]
-
-            
-    fig = display_multiple_images_fft_progress(model,sample_tensors, sample_images, predicted_labels)
-    Path(saving_location+f"/{model_name}/fft").mkdir(parents=True, exist_ok=True)
-    fig.savefig(saving_location+f"/{model_name}/fft/fft_map_index_{index}.png")
-

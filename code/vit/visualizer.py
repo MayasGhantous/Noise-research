@@ -16,8 +16,9 @@ class ViTBatchAttentionVisualizer:
     def __init__(self, model, unet=None):
         self.model = model
         self.unet = unet
-        self.qkv_output = None
-        self.hook_handle = None
+        self.qkv_outputs = []
+        self.hook_handles = []
+        self.target_blocks = [0, 2, 5, 11]
         # Dynamically get the number of attention heads from the model
         self.num_heads = self.model.blocks[-1].attn.num_heads
 
@@ -25,9 +26,10 @@ class ViTBatchAttentionVisualizer:
         def hook(module, input, output):
             # Capture the output of the QKV linear layer 
             # Shape: [Batch_Size, Num_Tokens, 3 * Embedding_Dim]
-            self.qkv_output = output.detach().cpu()
+            self.qkv_outputs.append(output.detach().cpu())
         return hook
 
+    # batch meaning "clean, noise1, noise2"
     def extract_and_return_figure(self, data_name, input_batch, true_labels):
         batch_size = input_batch.shape[0]
         device = next(self.model.parameters()).device
@@ -43,48 +45,60 @@ class ViTBatchAttentionVisualizer:
             unet_batch = input_batch
 
         self.model.eval()
+        self.qkv_outputs.clear()
 
-        # 2. Register the hook to the QKV projection layer
-        target_layer = self.model.blocks[-1].attn.qkv
-        self.hook_handle = target_layer.register_forward_hook(self._get_qkv_hook())
+        # 2. Register the hook to the QKV projection layer for multiple blocks
+        for b in self.target_blocks:
+            target_layer = self.model.blocks[b].attn.qkv
+            self.hook_handles.append(target_layer.register_forward_hook(self._get_qkv_hook()))
 
         # 3. Forward pass through ViT
         with torch.no_grad():
             outputs = self.model(unet_batch) # Pass the U-Net output to the ViT (or original if unet is None)
             predictions = outputs.argmax(dim=1).cpu()
 
-        self.hook_handle.remove()
+        for handle in self.hook_handles:
+            handle.remove()
+        self.hook_handles.clear()
 
         # ==========================================
         # 4. MANUALLY COMPUTE THE ATTENTION MATRIX
         # ==========================================
-        B, N, C = self.qkv_output.shape
-        head_dim = (C // 3) // self.num_heads
-
-        # Reshape exactly like `timm` does internally, and split into Q, K, V
-        qkv = self.qkv_output.reshape(B, N, 3, self.num_heads, head_dim).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv.unbind(0) # Each is shape [Batch, Num_Heads, Tokens, Head_Dim]
-
-        # Calculate Attention: Softmax( (Q * K^T) / sqrt(head_dim) )
-        scale = head_dim ** -0.5
-        attn = (q @ k.transpose(-2, -1)) * scale
-        attn = attn.softmax(dim=-1) # Shape: [Batch, Num_Heads, Tokens, Tokens]
-        # ==========================================
-
-        # 5. Process Heatmaps
-        cls_attention = attn[:, :, 0, 1:] 
-        cls_attention = cls_attention.mean(dim=1) 
+        all_heatmaps = []
         
-        grid_size = int(np.sqrt(cls_attention.shape[1]))
-        cls_attention = cls_attention.reshape(batch_size, grid_size, grid_size)
-        
-        cls_attention = cls_attention.unsqueeze(1)
-        heatmaps = F.interpolate(cls_attention, size=(input_batch.shape[2], input_batch.shape[3]), mode='bilinear', align_corners=False)
-        heatmaps = heatmaps.squeeze(1).numpy() 
-        
-        for i in range(batch_size):
-            h_min, h_max = heatmaps[i].min(), heatmaps[i].max()
-            heatmaps[i] = (heatmaps[i] - h_min) / (h_max - h_min + 1e-8)
+        for qkv_output in self.qkv_outputs:
+            B, N, C = qkv_output.shape # 
+            head_dim = (C // 3) // self.num_heads
+
+            # Reshape exactly like `timm` does internally, and split into Q, K, V
+            qkv = qkv_output.reshape(B, N, 3, self.num_heads, head_dim).permute(2, 0, 3, 1, 4)
+            q, k, v = qkv.unbind(0) # Each is shape [Batch, Num_Heads, Tokens, Head_Dim]
+
+            # Calculate Attention: Softmax( (Q * K^T) / sqrt(head_dim) )
+            scale = head_dim ** -0.5
+            attn = (q @ k.transpose(-2, -1)) * scale
+            attn = attn.softmax(dim=-1) # Shape: [Batch, Num_Heads, Tokens, Tokens]
+            # ==========================================
+
+            # 5. Process Heatmaps
+            cls_attention = attn[:, :, 0, 1:] # taking attention with the classification token.
+            cls_attention = cls_attention.mean(dim=1) 
+            
+            grid_size = int(np.sqrt(cls_attention.shape[1]))
+            cls_attention = cls_attention.reshape(batch_size, grid_size, grid_size)
+            
+            cls_attention = cls_attention.unsqueeze(1)
+            layer_heatmaps = F.interpolate(cls_attention, size=(input_batch.shape[2], input_batch.shape[3]), mode='bilinear', align_corners=False)
+            layer_heatmaps = layer_heatmaps.squeeze(1).numpy() 
+            
+            for i in range(batch_size):
+                h_min, h_max = layer_heatmaps[i].min(), layer_heatmaps[i].max()
+                layer_heatmaps[i] = (layer_heatmaps[i] - h_min) / (h_max - h_min + 1e-8)
+                
+            all_heatmaps.append(layer_heatmaps)
+
+        # Shape: [Batch_Size, Num_Blocks, Height, Width]
+        heatmaps_stacked = np.stack(all_heatmaps, axis=1)
 
         if isinstance(true_labels, torch.Tensor):
             true_labels = true_labels.cpu().tolist()
@@ -94,18 +108,21 @@ class ViTBatchAttentionVisualizer:
             data_name,
             input_batch.cpu(), 
             unet_batch.detach().cpu(), 
-            heatmaps, 
+            heatmaps_stacked, 
             true_labels, 
             predictions
-            
         )
-    def _create_batch_figure(self,data_name, input_batch, unet_batch, heatmaps, true_labels, predictions):
+    
+    def _create_batch_figure(self, data_name, input_batch, unet_batch, heatmaps, true_labels, predictions):
         batch_size = input_batch.shape[0]
+        num_blocks = len(self.target_blocks)
         has_unet = self.unet is not None
-        num_cols = 4 if has_unet else 3
+        
+        # Original Image + U-Net (optional) + 2 columns per block (Heatmap & Overlay)
+        num_cols = 1 + (1 if has_unet else 0) + num_blocks
         
         # Adjust figure size dynamically based on the number of columns
-        fig, axes = plt.subplots(batch_size, num_cols, figsize=(5 * num_cols, 5 * batch_size))
+        fig, axes = plt.subplots(batch_size, num_cols, figsize=(4 * num_cols + 3, 4 * batch_size))
         
         if batch_size == 1:
             axes = np.expand_dims(axes, axis=0)
@@ -113,7 +130,6 @@ class ViTBatchAttentionVisualizer:
         for i in range(batch_size):
             # Assuming denormalize and get_class_name are defined in your outer scope
             vis_img = denormalize(input_batch[i]).permute(1, 2, 0).numpy()
-            heatmap = heatmaps[i]
             
             t_label = true_labels[i]
             p_label = predictions[i]
@@ -141,21 +157,28 @@ class ViTBatchAttentionVisualizer:
                 unet_vis_img = ((u_img - u_min) / (u_max - u_min + 1e-8)).permute(1, 2, 0).numpy()
 
                 axes[i, col_idx].imshow(unet_vis_img)
-                axes[i, col_idx].set_title(f"U-Net Feature Map\nPred: {p_text}", color=title_color, fontsize=14, fontweight='bold')
+                axes[i, col_idx].set_title(f"U-Net Map\nPred: {p_text}", color=title_color, fontsize=14, fontweight='bold')
                 axes[i, col_idx].axis('off')
                 col_idx += 1
 
-            # Column 3: Attention Heatmap
-            axes[i, col_idx].imshow(heatmap, cmap='jet')
-            axes[i, col_idx].set_title("Attention Heatmap", fontsize=14)
-            axes[i, col_idx].axis('off')
-            col_idx += 1
-            
-            # Column 4: Overlay on Original Image
-            axes[i, col_idx].imshow(vis_img)
-            axes[i, col_idx].imshow(heatmap, cmap='jet', alpha=0.5) 
-            axes[i, col_idx].set_title("Overlay", fontsize=14)
-            axes[i, col_idx].axis('off')
+            # Columns for each target block
+            for b_idx, block_num in enumerate(self.target_blocks):
+                heatmap = heatmaps[i, b_idx]
+                
+                # Column: Attention Heatmap
+                axes[i, col_idx].imshow(heatmap, cmap='jet')
+                axes[i, col_idx].set_title(f"Block {block_num} Heatmap", fontsize=14)
+                axes[i, col_idx].axis('off')
+                col_idx += 1
+                
+                # Column: Overlay on Original Image
+                """
+                axes[i, col_idx].imshow(vis_img)
+                axes[i, col_idx].imshow(heatmap, cmap='jet', alpha=0.5) 
+                axes[i, col_idx].set_title(f"Block {block_num} Overlay", fontsize=14)
+                axes[i, col_idx].axis('off')
+                col_idx += 1
+                """
             
         plt.tight_layout()
         return fig
