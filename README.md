@@ -8,10 +8,10 @@ to run the code training, open the relevant `train.py` (e.g., under `code/`) and
 prob (float, 0 to 1): percentage of the dataset that is noisy. If 0, there is no noisy data in the dataset.<br><br>
 group_norm (int): if > 0, replaces normalization layers in the architecture with GroupNorm using `group_norm` groups; if 0, the default normalization is used.
 <br>
-unet(boolean): do I want to rap the model in a unet or not
+unet (boolean): whether to wrap the model in a U-Net or not
 <br>
 <br>
-data_name(string): is should be "imagenette" or "gtsrb" depends what data set you want to use.
+data_name (string): it should be "imagenette" or "gtsrb" depending on which dataset you want to use.
 
 <br><br>
 noise_type(string): its eather "gaussian","motion_blur" or "defocus_blur".
