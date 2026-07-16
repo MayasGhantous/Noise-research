@@ -81,4 +81,5 @@ def make_graphs():
     plt.savefig(PLT_PATH+"/ViT_Unet_plot")
     plt.show()
 
-make_comparison(["resnet18","VIT"])
+make_comparison(["Unet_False","Unet_True"])
+#print(timm.create_model('vit_tiny_patch16_224',pretrained=True))
