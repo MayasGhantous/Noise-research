@@ -15,13 +15,13 @@ def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False,
             target_run_name = f"{data_name}_{noise_type}_Modifiedresnet18_group_norm{group_norm}_Unet_{unet}"
         elif model_name == "VIT":
             target_run_name = f"{data_name}_{noise_type}_VIT_group_norm{group_norm}_Unet_{unet}"
-    else:
+    elif prob == 0.0:
         if model_name == "resnet18":
-            target_run_name = f"{data_name}_{noise_type}_resnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+            target_run_name = f"{data_name}_resenet18_pretrained"
         elif model_name == "Modifiedresnet18":
-            target_run_name = f"{data_name}_{noise_type}_Modifiedresnet18_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+            target_run_name = f"{data_name}_Modifiedresnet18_pretrained"
         elif model_name == "VIT":
-            target_run_name = f"{data_name}_{noise_type}_VIT_prob{prob}_group_norm{group_norm}_Unet_{unet}"
+            target_run_name = f"{data_name}_VIT_pretrained"
     target_run_name = f"{target_run_name}_{train_method}"
     #target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
     if pretrained:
