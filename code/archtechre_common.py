@@ -400,12 +400,18 @@ def train_model(model, train_loader, val_loader, val_loader2, val_loader3, crite
             
             wandb.log({f"Network Progression ": wandb.Image(fig)})
             plt.close(fig)
-
-        if best_accuracy <= noisy_acc:
-            best_accuracy = noisy_acc
-            torch.save(model.state_dict(), wandb.config.best_model_filename)
-            print(f"New best model saved as '{wandb.config.best_model_filename}' with accuracy: {best_accuracy:.2f}%")
-            wandb.run.summary["best_val_accuracy_noisy"] = best_accuracy
+        if config.train_noise_prob > 0:
+            if best_accuracy <= noisy_acc:
+                best_accuracy = noisy_acc
+                torch.save(model.state_dict(), wandb.config.best_model_filename)
+                print(f"New best model saved as '{wandb.config.best_model_filename}' with accuracy: {best_accuracy:.2f}%")
+                wandb.run.summary["best_val_accuracy_noisy"] = best_accuracy
+        else: 
+            if best_accuracy <= clean_acc:
+                best_accuracy = clean_acc
+                torch.save(model.state_dict(), wandb.config.best_model_filename)
+                print(f"New best model saved as '{wandb.config.best_model_filename}' with accuracy: {best_accuracy:.2f}%")
+                wandb.run.summary["best_val_accuracy_clean"] = best_accuracy
 
     print("Training completed.")
 
