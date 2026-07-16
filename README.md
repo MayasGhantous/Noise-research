@@ -21,7 +21,7 @@ model_name(string): is the model type you need to train it should be "resnet18",
 <br><br>
 pretrained(boolean): means if you want to use a pretrained model on the clean dataset 
 <br><br>
-train_meathond(string): it should be "method1" or "method2", where method1 is the regular CrossEntropyLoss and for meathed 2 we added another loss and MSE loss that makes the Unet output for the noisy image and the regualr the same. 
+train_method(string): it should be "method1" or "method2", where method1 is the regular CrossEntropyLoss and for method2 we added another loss and an MSE loss that makes the Unet output for the noisy image and the regular the same. 
 <br> <br>
 notes: 
 1.  if you want to use pretraining then you must have first train th model with prob = 0 , unet = false, grop_norm = 0  and method1, this would save a pretrained model on the model directory.
