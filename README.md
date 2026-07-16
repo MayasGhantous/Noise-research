@@ -1,6 +1,6 @@
-## Enviroments: 
-we used 2 enviroments the first one for named requirements.txt where requglar opencv-python is included these are for the regular operating systems with GUI.<br>
-the other one requirements_runpods.txt that has opencv-python-headless where the operating system does not have GUI.<br>
+## Environments
+We use 2 environments. The first one is named `requirements.txt`, where regular `opencv-python` is included; these are for regular operating systems with a GUI.<br>
+The other one is `requirements_runpods.txt` that has `opencv-python-headless`, where the operating system does not have a GUI.<br>
 ## training: 
 #### 
 to run the code training, open train.py and use the main funciton from base_traning.<br>
