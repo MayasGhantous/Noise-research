@@ -5,9 +5,8 @@ The other one is `requirements_runpods.txt` that has `opencv-python-headless`, w
 #### 
 to run the code training, open the relevant `train.py` (e.g., under `code/`) and use the main function from `base_training.py`.<br>
 ### the parameters of this main: 
-prob(float 0 to 1): means the percen of the datasets that is noisy, if 0 then there is no noisy data in the data set. <br><br>
-group_norm(int): changes the normlization layers of the archtichre to group norm with grop number equlas to group_norm if it is 0 then the base norm is used. 
-<br>
+prob (float, 0 to 1): percentage of the dataset that is noisy. If 0, there is no noisy data in the dataset.<br><br>
+group_norm (int): if > 0, replaces normalization layers in the architecture with GroupNorm using `group_norm` groups; if 0, the default normalization is used.
 <br>
 unet(boolean): do I want to rap the model in a unet or not
 <br>
