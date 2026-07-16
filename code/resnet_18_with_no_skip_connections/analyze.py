@@ -53,4 +53,4 @@ if __name__ == "__main__":
         #main(data_name, model_name, group_norm, unet, noise_type)
         saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name+"/individual_figures"
         save_figure_for_index(data_name, model_name, group_norm, unet, noise_type, index=80, models_location=str(Path(__file__).parent), saving_location=saving_location, load_model=load_model, model_type="Modifiedresnet18")
-    #save_fft_map_for_an_index("imagenette", "motion_base.pth", group_norm=0, unet=False, index=50, gaussian=True, load_model=load_model, saving_location=str(Path(__file__).parent)+"/analysis_results", models_location=str(Path(__file__).parent))
+   
