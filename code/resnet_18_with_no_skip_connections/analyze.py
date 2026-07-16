@@ -16,7 +16,10 @@ def load_model(model_name,group_norm,unet,models_location):
     if unet:
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
-    model.load_state_dict(torch.load(models_location+f"/{model_name}"))
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(models_location+f"/{model_name}"))
+    else:
+        model.load_state_dict(torch.load(models_location+f"/{model_name}", map_location=torch.device('cpu')))
     return model
 
 def main(dataset_name, model_name, group_norm, unet, noise_type, models_location = str(Path(__file__).parent)):

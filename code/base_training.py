@@ -5,7 +5,7 @@ from torchvision import models
 import timm
 from resnet_18_with_no_skip_connections.network import create_resnet18_without_skip
 
-def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False, train_method="method2"):
+def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False, train_method="method1"):
     entity_name = "wandb-mias-"  # Replace with your WandB entity name
     project_name = "Noise_Research"  # Replace with your WandB project name
     if prob == 0.5:

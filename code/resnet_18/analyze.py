@@ -18,7 +18,11 @@ def load_model(model_name,group_norm,unet,models_location):
     if unet:
         print("Wrapping the model with UNet...")
         model = UNetWrapper(base_model=model)
-    model.load_state_dict(torch.load(models_location+f"/{model_name}"))
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(models_location+f"/{model_name}"))
+    else:
+        model.load_state_dict(torch.load(models_location+f"/{model_name}", map_location=torch.device('cpu')))
+    model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     return model
 
 
@@ -38,18 +42,24 @@ def main(dataset_name, model_name, group_norm, unet, noise_type, models_location
     saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name
     #test_gaussian(model, loader_clean, loader_noise1, loader_noise2, device, std1=0.5, std2=1.0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    save_figures(model, model_visualizer, loader_clean, loader_noise1, loader_noise2,device , saving_location, max_samples=5)
+    save_figures(dataset_name, model, model_visualizer, loader_clean, loader_noise1, loader_noise2,device, saving_location, max_samples=5)
     # save_features(model,model_visualizer, loader_clean, loader_noise1, loader_noise2, device, saving_location)
 
 if __name__ == "__main__":
     data_sets = ["imagenette"]
-    models_name =["imagenette_motion_blur_resnet18_base_line.pth"]
+    models_name =["imagenette_defocus_blur_resnet18_group_norm0_Unet_False_pretrained.pth"]
     group_norms = [0]
     unets = [False]
-    noise_types = ["motion_blur"]
+    noise_types = ["defocus_blur"]
+    
     for data_name,model_name, group_norm, unet, noise_type in zip(data_sets, models_name, group_norms, unets, noise_types):
-
         saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name+"/individual_figures"
-
-        save_figure_for_index(data_name, model_name, group_norm, unet, noise_type, index=90, models_location=str(Path(__file__).parent), saving_location=saving_location, load_model=load_model, model_type="resnet18")
-        #main(data_name, model_name, group_norm, unet, noise_type)
+        
+        indexes = range(0, 2000, 40)
+        for index in indexes:
+            save_figure_for_index(data_name, model_name, group_norm, unet, noise_type, index=index,
+                               models_location=str(Path(__file__).parent), 
+                               saving_location=saving_location, load_model=load_model, model_type="resnet")
+        
+        #main(data_name, model_name, group_norm, unet, noise_type,
+        #    models_location="C:/Users/1ronk/Documents/Python/Noise-research/code/models")
