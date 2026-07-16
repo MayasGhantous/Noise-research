@@ -48,35 +48,20 @@ def main(dataset_name, model_name, group_norm, unet, noise_type, models_location
 
 
 if __name__ == "__main__":
-    """
-    data_sets = ["gtsrb", "gtsrb"]
-    models_name =["gtsrb_motion_blur_VIT_group_norm0_Unet_False.pth", 
-     "gtsrb_motion_blur_VIT_group_norm0_Unet_False_pretrained.pth"]
-    group_norms = [0, 0]
-    unets = [False, False]
-    noise_types = ["motion_blur", "motion_blur"]
-    """
-    """
-    data_sets = ["gtsrb"]
-    models_name =["gtsrb_motion_blur_VIT_group_norm0_Unet_False_pretrained.pth"]
-    group_norms = [0]
-    unets = [False]
-    noise_types = ["motion_blur"]
-    """
-    data_sets = ["gtsrb"]
-    models_name =["gtsrb_defocus_blur_ViT_group_norm0_Unet_False_pretrained.pth"]
+    data_sets = ["imagenette"]
+    models_name =["imagenette_defocus_blur_ViT_group_norm0_Unet_False_pretrained.pth"]
     group_norms = [0]
     unets = [False]
     noise_types = ["defocus_blur"]
     for data_name,model_name, group_norm, unet, noise_type in zip(data_sets, models_name, group_norms, unets, noise_types):
-        main(data_name, model_name, group_norm, unet, noise_type, models_location="C:/Users/1ronk/Documents/Python/Noise-research/code/models")
-        """
+        # main(data_name, model_name, group_norm, unet, noise_type, models_location="C:/Users/1ronk/Documents/Python/Noise-research/code/models")
+        
         saving_location = str(Path(__file__).parent)+f"/analysis_results/{noise_type}/"+model_name+"/individual_figures"
-        indexes = range(120, 175)
+        indexes = range(2000, 3000, 40)
         for index in indexes:
             save_figure_for_index(data_name, model_name, group_norm, unet, noise_type, index=index,
-                               models_location="C:/Users/1ronk/Documents/Python/Noise-research/code/models", 
+                               models_location=str(Path(__file__).parent), 
                                saving_location=saving_location, load_model=load_model, model_type="VIT")
-        """
+        
         
     

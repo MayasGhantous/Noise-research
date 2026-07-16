@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import timm
+
 import pandas as pd
 import ast
 
@@ -82,4 +82,3 @@ def make_graphs():
     plt.show()
 
 make_comparison(["Unet_False","Unet_True"])
-#print(timm.create_model('vit_tiny_patch16_224',pretrained=True))
