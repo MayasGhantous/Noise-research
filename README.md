@@ -1,32 +1,37 @@
 ## Environments
 We use 2 environments. The first one is named `requirements.txt`, where regular `opencv-python` is included; these are for regular operating systems with a GUI.<br>
 The other one is `requirements_runpods.txt` that has `opencv-python-headless`, where the operating system does not have a GUI.<br>
-## training: 
+## Training: 
 #### 
-to run the code training, open the relevant `train.py` (e.g., under `code/`) and use the main function from `base_training.py`.<br>
-### the parameters of this main: 
+To run the code training, open the relevant `train.py` (e.g., under `code/`) and use the main function from `base_training.py`.<br>
+### Parameters of This Main: 
 prob (float, 0 to 1): percentage of the dataset that is noisy. If 0, there is no noisy data in the dataset.<br><br>
 group_norm (int): if > 0, replaces normalization layers in the architecture with GroupNorm using `group_norm` groups; if 0, the default normalization is used.
 <br>
-unet (boolean): whether to wrap the model in a U-Net or not
-<br>
-<br>
-data_name (string): it should be "imagenette" or "gtsrb" depending on which dataset you want to use.
 
-<br><br>
-noise_type(string): its eather "gaussian","motion_blur" or "defocus_blur".
-<br><br>
-model_name(string): is the model type you need to train it should be "resnet18","Modifiedresnet18" or "VIT".
-<br><br>
-pretrained(boolean): means if you want to use a pretrained model on the clean dataset 
-<br><br>
-train_method(string): it should be "method1" or "method2", where method1 is the regular CrossEntropyLoss and for method2 we added another loss and an MSE loss that makes the Unet output for the noisy image and the regular the same. 
-<br> <br>
-notes: 
-1.  if you want to use pretraining then you must have first train th model with prob = 0 , unet = false, grop_norm = 0  and method1, this would save a pretrained model on the model directory.
-2. if you want to change another hyper parameters then you should open base_traning,py there exists all of the other hyper paramters.
-3. you must connect to a wandb account so you can see the visulization online while tranining.
-4. if for some reason the training stops the code handles it just rerun the same command.
+unet (boolean): Whether to wrap the model in a U-Net or not.
+<br>
+
+data_name (string): Should be "imagenette" or "gtsrb" depending on which dataset you want to use.
+<br>
+
+noise_type(string): Either "gaussian","motion_blur" or "defocus_blur".
+<br>
+
+model_name(string): Is the model type you need to train. It should be "resnet18","Modifiedresnet18" or "VIT".
+<br>
+
+pretrained(boolean): If you want to use a model that was pretrained on the clean dataset.
+<br>
+
+train_method(string): Should be "method1" or "method2", where method1 is the regular CrossEntropyLoss and for method2 we added another loss and an MSE loss that makes the Unet output for the noisy image and the regular the same. 
+<br> 
+
+Notes: 
+1.  If you want to use pretraining then you must have first train th model with prob = 0 , unet = false, grop_norm = 0  and method1, this would save a pretrained model on the model directory.
+2. If you want to change another hyper parameters then you should open base_traning,py there exists all of the other hyper paramters.
+3. You must connect to a wandb account so you can see the visulization online while tranining.
+4. If for some reason the training stops, the code handles it just rerun the same command.
 
 ## Analysis
 After training, each model directory should include `.pth` files. We have two functions for analysis.<br><br>
