@@ -22,7 +22,8 @@ def main(prob,group_norm,unet,data_name,noise_type,model_name, pretrained=False,
             target_run_name = f"{data_name}_Modifiedresnet18_pretrained"
         elif model_name == "VIT":
             target_run_name = f"{data_name}_VIT_pretrained"
-    target_run_name = f"{target_run_name}_{train_method}"
+    if (train_method == "method2"):
+        target_run_name = f"{target_run_name}_{train_method}"
     #target_run_name = f"{data_name}_{noise_type}_resnet18_base_line"
     if pretrained:
         target_run_name = f"{target_run_name}_pretrained"
