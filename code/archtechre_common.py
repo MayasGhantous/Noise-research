@@ -345,7 +345,10 @@ def get_traing_val_test_loaders(config):
 
 def train_model(model, train_loader, val_loader, val_loader2, val_loader3, criterion, optimizer, device, prog_vis=None, config=None):
     print("\nStarting training...")
-    best_accuracy = evaluate_model(model, val_loader2, device, description="Initial Validation Accuracy")
+    if config.train_noise_prob > 0:
+        best_accuracy = evaluate_model(model, val_loader2, device, description="Initial Validation Accuracy")
+    else:
+        best_accuracy = evaluate_model(model, val_loader, device, description="Initial Validation Accuracy")
     num_epochs = config.num_epochs
     plot_every_n_epochs = config.plot_every_n_epochs
 
