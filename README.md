@@ -1,9 +1,15 @@
+## Link To This Repository:
+https://github.com/MayasGhantous/Noise-research
+
 ## Environments
 We use 2 environments. The first one is named `requirements.txt`, where regular `opencv-python` is included; these are for regular operating systems with a GUI.<br>
 The other one is `requirements_runpods.txt` that has `opencv-python-headless`, where the operating system does not have a GUI.<br>
 ## Training: 
 #### 
 To run the code training, open the relevant `train.py` (e.g., under `code/`) and use the main function from `base_training.py`.<br>
+Our code uses wandb to organize data, so in the `base_training.py` file, you need to change entity_name and project_name to your account and project.
+
+The final training results are downloaded to a csv in `import_wandb_data.py` where project information also needs to be written.
 ### Parameters of This Main: 
 prob (float, 0 to 1): percentage of the dataset that is noisy. If 0, there is no noisy data in the dataset.<br><br>
 group_norm (int): if > 0, replaces normalization layers in the architecture with GroupNorm using `group_norm` groups; if 0, the default normalization is used.
